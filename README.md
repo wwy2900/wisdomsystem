@@ -1,6 +1,8 @@
-# WisdomSystem - 智能客服系统
+# WisdomSystem - 智扫通智能客服系统
 
-基于 LangChain + LangGraph 构建的企业级智能客服系统，支持高级 RAG 检索、四层记忆库和断点续聊功能。
+基于 **LangChain + LangGraph** 构建的企业级智能客服系统，支持高级 RAG 检索、四层记忆库和断点续聊功能。
+
+---
 
 ## 🚀 功能特性
 
@@ -41,12 +43,13 @@
 
 | 优化项 | 效果 |
 |--------|------|
-| 懒加载模型 | 启动时间从 19.88 秒降至 0.48 秒 |
-| 异步并行初始化 | 组件并行加载，减少初始化时间 |
-| 查询缓存 | 缓存命中时响应时间从 0.5 秒降至 0.0 秒 |
-| BM25 分词缓存 | 首次检索 18 秒，后续检索 0.02 秒 |
-| Redis 缓存 | RAG 结果缓存，默认 24 小时过期 |
-| Agent 重复调用修复 | 流程执行次数从 2 次/问题减少到 1 次/问题 |
+| **单例模式** | 所有核心组件采用单例模式，避免重复初始化 |
+| **懒加载模型** | 启动时间优化 |
+| **Redis 缓存** | RAG 结果缓存，默认 24 小时过期 |
+| **Query 缓存** | 缓存命中时响应时间显著降低 |
+| **系统消息优化** | 修复多系统消息冲突问题 |
+
+---
 
 ## 📊 RAG 评估结果
 
@@ -60,6 +63,8 @@
 
 测试用例：50 个真实用户刁钻提问（口语化、简短、不标准）
 
+---
+
 ## 🛠️ 技术栈
 
 | 模块 | 技术 | 版本 |
@@ -72,34 +77,36 @@
 | **缓存** | Redis / SimpleCache | - |
 | **数据库** | SQLite | - |
 
+---
+
 ## 📁 项目结构
 
 ```
 WisdomSystem/
 ├── agent/                  # ReAct Agent 核心
 │   ├── tools/              # 工具定义
-│   │   ├── agent_tools.py  # 业务工具（RAG检索、预热等）
+│   │   ├── agent_tools.py  # 业务工具（RAG检索、天气查询等）
 │   │   └── middleware.py   # 中间件（日志、提示词注入）
-│   └── react_agent.py      # ReAct Agent 实现（流式输出思考过程）
+│   └── react_agent.py      # ReAct Agent 实现（流式输出）
 ├── rag/                    # RAG 检索模块
 │   ├── contextual_enhancer.py  # Contextual Retrieval（上下文增强）
 │   ├── question_splitter.py    # 按问题切分文档
 │   ├── query_rewriter.py       # Query 改写（三路改写 + 语义校验）
-│   ├── semantic_checker.py     # 语义相似度校验（快速预过滤 + API计算）
-│   ├── bm25_retriever.py       # BM25 检索（jieba分词 + 缓存）
+│   ├── semantic_checker.py     # 语义相似度校验
+│   ├── bm25_retriever.py       # BM25 检索
 │   ├── rrf_fusion.py           # RRF 融合算法
-│   ├── reranker.py             # Rerank 精排（批量嵌入计算）
-│   ├── vector_store.py         # 向量存储（懒加载）
-│   └── rag_service.py          # RAG 服务入口（Redis缓存）
+│   ├── reranker.py             # Rerank 精排
+│   ├── vector_store.py         # 向量存储
+│   └── rag_service.py          # RAG 服务入口
 ├── memory/                 # 记忆管理
 │   ├── layers.py           # 四层记忆定义
-│   ├── memory_manager.py   # 记忆管理器
-│   └── session_manager.py  # 会话管理（自动加载历史会话）
+│   ├── memory_manager.py   # 记忆管理器（单例模式）
+│   └── session_manager.py  # 会话管理
 ├── database/               # 数据库模块
-│   ├── sqlite_db.py        # SQLite 数据存储
-│   └── redis_cache.py      # Redis 缓存（降级到内存缓存）
+│   ├── sqlite_db.py        # SQLite 数据存储（单例模式）
+│   └── redis_cache.py      # Redis 缓存（单例模式，降级到内存缓存）
 ├── model/                  # 模型工厂
-│   └── factory.py          # 通义千问模型初始化（懒加载）
+│   └── factory.py          # 通义千问模型初始化
 ├── config/                 # 配置文件
 │   ├── agent.yml           # Agent 配置
 │   ├── chroma.yml          # 向量库配置
@@ -110,6 +117,8 @@ WisdomSystem/
 │   ├── rag_summarize.txt   # RAG 总结提示词
 │   └── report_prompt.txt   # 报告生成提示词
 ├── data/                   # 知识库文档
+│   ├── external/           # 外部数据
+│   │   └── records.csv     # 用户使用记录
 │   ├── 扫地机器人100问.pdf
 │   ├── 扫地机器人100问2.txt
 │   ├── 扫拖一体机器人100问.txt
@@ -118,34 +127,41 @@ WisdomSystem/
 │   └── 选购指南.txt
 ├── tests/                  # 测试模块
 │   ├── rag_evaluation.py   # RAG 评估脚本
-│   ├── test_cases.json     # 刁钻测试用例（50个）
-│   └── debug_retrieval.py  # 检索调试脚本
+│   └── test_cases.json     # 测试用例（50个）
 ├── utils/                  # 工具函数
 │   ├── config_handler.py   # 配置加载
 │   ├── prompt_loader.py    # 提示词加载
 │   ├── logger_handler.py   # 日志处理
-│   ├── async_init.py       # 异步并行初始化服务
-│   └── cache.py            # 查询缓存服务（LRU + TTL）
+│   └── path_tool.py        # 路径工具
 ├── app.py                  # Streamlit 前端入口
 ├── requirements.txt        # 依赖清单
-├── .env.example           # 环境变量配置模板
-└── langgraph_flow.md       # LangGraph 流程文档
+├── .env                    # 环境变量配置（需自行配置）
+├── AGENTS.md               # Agent 系统设计文档
+└── README.md               # 项目说明文档
 ```
+
+---
 
 ## 🔧 安装步骤
 
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/fanjingbo3/wisdomsystem.git
+git clone https://github.com/wwy2900/wisdomsystem.git
 cd wisdomsystem
 ```
 
 ### 2. 创建虚拟环境
 
 ```bash
-conda create -n Bot python=3.11
-conda activate Bot
+# 使用 conda（推荐）
+conda create -n wisdomsystem-py311 python=3.11
+conda activate wisdomsystem-py311
+
+# 或使用 venv
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
 ```
 
 ### 3. 安装依赖
@@ -156,19 +172,18 @@ pip install -r requirements.txt
 
 ### 4. 配置环境变量
 
-项目提供了 `.env.example` 文件作为配置模板：
+创建并编辑 `.env` 文件：
 
 ```bash
-# 复制配置模板
-cp .env.example .env
+# Windows: 使用记事本或 IDE 打开
+notepad .env
 
-# 编辑 .env 文件，填入您的 API Key
-# Windows: 使用记事本或 IDE 打开 .env 文件
-# Linux/Mac: nano .env 或 vim .env
+# Linux/Mac: 使用编辑器
+nano .env
 ```
 
 `.env` 文件内容：
-```
+```env
 # 通义千问 API 密钥（必填）
 DASHSCOPE_API_KEY=your_api_key_here
 
@@ -202,29 +217,22 @@ docker run -d -p 6379:6379 redis
 
 ```bash
 # 启动 Streamlit 前端
-streamlit run app.py --server.port 8501
+streamlit run app.py
 ```
 
-访问 http://localhost:8501 即可使用。
+访问 **http://localhost:8501** 即可使用。
 
 ### 7. 首次运行说明
 
 首次运行时，系统会自动执行以下操作：
 1. **加载知识库文档**：从 `data/` 目录读取所有文档
 2. **切分文档**：使用 `QuestionBasedSplitter` 按问题切分
-3. **上下文增强**：为每个 chunk 添加上下文描述（章节、主题、摘要）
+3. **上下文增强**：为每个 chunk 添加上下文描述
 4. **构建向量库**：将文档向量存储到 ChromaDB（`chroma_db/` 目录）
 
 **首次运行时间**：约 5-10 分钟（取决于文档数量和网络速度）
 
-### 8. 运行 RAG 评估
-
-```bash
-# 测试召回率和忠诚度
-python tests/rag_evaluation.py
-```
-
-评估结果会保存到 `rag_evaluation_results.json`。
+---
 
 ## 🧪 RAG 评估
 
@@ -239,13 +247,19 @@ python tests/rag_evaluation.py
 - **MRR**: 平均倒数排名，衡量检索精度
 - **忠诚度**: 回答是否基于检索到的文档，无幻觉
 
+评估结果会保存到 `rag_evaluation_results.json`。
+
+---
+
 ## 🔗 知识库文档
 
 项目内置扫地机器人相关知识库：
 - 产品问答（100问 × 3）
 - 故障排除指南
-- 维护保养建议（200条）
+- 维护保养建议
 - 选购指南
+
+---
 
 ## 📝 配置说明
 
@@ -255,6 +269,7 @@ python tests/rag_evaluation.py
 agent_name: WisdomAgent
 max_iterations: 10
 temperature: 0.7
+external_data_path: data/external/records.csv
 ```
 
 ### rag.yml
@@ -274,10 +289,21 @@ collection_name: knowledge_base
 k: 10
 ```
 
+---
+
 ## 📄 许可证
 
 MIT License
 
+---
+
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
+
+---
+
+**项目地址**：https://github.com/wwy2900/wisdomsystem
+
+**文档说明**：
+- `AGENTS.md` - Agent 系统设计文档，包含架构说明和扩展指南
