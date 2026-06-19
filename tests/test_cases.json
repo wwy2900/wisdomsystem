@@ -1,0 +1,745 @@
+[
+  {
+    "id": "test_001",
+    "user_query": "咋充电",
+    "relevant_doc_ids": [
+      "chunk_0035",
+      "chunk_0085",
+      "chunk_0103"
+    ],
+    "expected_keywords": [
+      "充电",
+      "充电座",
+      "电源适配器"
+    ],
+    "note": "口语化简短提问，需要 Query 改写"
+  },
+  {
+    "id": "test_002",
+    "user_query": "首次使用咋弄",
+    "relevant_doc_ids": [
+      "chunk_0101",
+      "chunk_0182",
+      "chunk_0307"
+    ],
+    "expected_keywords": [
+      "首次",
+      "开机",
+      "建图"
+    ],
+    "note": "新手提问，需要综合多个知识点"
+  },
+  {
+    "id": "test_003",
+    "user_query": "找不到充电座",
+    "relevant_doc_ids": [
+      "chunk_0035",
+      "chunk_0103",
+      "chunk_0104"
+    ],
+    "expected_keywords": [
+      "充电座",
+      "回充",
+      "传感器"
+    ],
+    "note": "常见故障"
+  },
+  {
+    "id": "test_004",
+    "user_query": "拖地效果怎么样",
+    "relevant_doc_ids": [
+      "chunk_0018",
+      "chunk_0115",
+      "chunk_0131"
+    ],
+    "expected_keywords": [
+      "拖地",
+      "水箱",
+      "湿拖"
+    ],
+    "note": "询问功能效果"
+  },
+  {
+    "id": "test_005",
+    "user_query": "会缠头发吗",
+    "relevant_doc_ids": [
+      "chunk_0007",
+      "chunk_0033",
+      "chunk_0111"
+    ],
+    "expected_keywords": [
+      "毛发",
+      "缠绕",
+      "滚刷"
+    ],
+    "note": "刁钻问题，需要理解同义词"
+  },
+  {
+    "id": "test_006",
+    "user_query": "虚拟墙咋设",
+    "relevant_doc_ids": [
+      "chunk_0015",
+      "chunk_0023",
+      "chunk_0304"
+    ],
+    "expected_keywords": [
+      "虚拟墙",
+      "禁区",
+      "APP"
+    ],
+    "note": "指代词+口语化"
+  },
+  {
+    "id": "test_007",
+    "user_query": "WiFi连不上",
+    "relevant_doc_ids": [
+      "chunk_0104",
+      "chunk_0147",
+      "chunk_0181"
+    ],
+    "expected_keywords": [
+      "WiFi",
+      "连接",
+      "配网"
+    ],
+    "note": "混合多概念，需要拆解"
+  },
+  {
+    "id": "test_008",
+    "user_query": "噪音太大",
+    "relevant_doc_ids": [
+      "chunk_0164",
+      "chunk_0306",
+      "chunk_0359"
+    ],
+    "expected_keywords": [
+      "噪音",
+      "静音",
+      "吸力"
+    ],
+    "note": "抱怨式提问，需要转换为解决方案"
+  },
+  {
+    "id": "test_009",
+    "user_query": "能爬地毯吗",
+    "relevant_doc_ids": [
+      "chunk_0011",
+      "chunk_0255",
+      "chunk_0305"
+    ],
+    "expected_keywords": [
+      "地毯",
+      "越障",
+      "门槛"
+    ],
+    "note": "口语化，需要理解语义"
+  },
+  {
+    "id": "test_010",
+    "user_query": "滤网咋清洗",
+    "relevant_doc_ids": [
+      "chunk_0009",
+      "chunk_0030",
+      "chunk_0065"
+    ],
+    "expected_keywords": [
+      "滤网",
+      "清洗",
+      "HEPA"
+    ],
+    "note": "简短口语化提问"
+  },
+  {
+    "id": "test_011",
+    "user_query": "边刷咋换",
+    "relevant_doc_ids": [
+      "chunk_0031",
+      "chunk_0066",
+      "chunk_0122"
+    ],
+    "expected_keywords": [
+      "边刷",
+      "更换",
+      "配件"
+    ],
+    "note": "功能操作，简短提问"
+  },
+  {
+    "id": "test_012",
+    "user_query": "APP有啥功能",
+    "relevant_doc_ids": [
+      "chunk_0020",
+      "chunk_0021",
+      "chunk_0022"
+    ],
+    "expected_keywords": [
+      "APP",
+      "手机",
+      "控制"
+    ],
+    "note": "省略主语，口语化"
+  },
+  {
+    "id": "test_013",
+    "user_query": "定时清扫咋设",
+    "relevant_doc_ids": [
+      "chunk_0057",
+      "chunk_0284",
+      "chunk_0370"
+    ],
+    "expected_keywords": [
+      "定时",
+      "预约",
+      "清扫计划"
+    ],
+    "note": "简略提问，需要补充主语"
+  },
+  {
+    "id": "test_014",
+    "user_query": "LDS和VSLAM哪个好",
+    "relevant_doc_ids": [
+      "chunk_0001",
+      "chunk_0002",
+      "chunk_0003"
+    ],
+    "expected_keywords": [
+      "LDS",
+      "VSLAM",
+      "导航"
+    ],
+    "note": "技术对比问题"
+  },
+  {
+    "id": "test_015",
+    "user_query": "滚刷和胶刷区别",
+    "relevant_doc_ids": [
+      "chunk_0007",
+      "chunk_0033",
+      "chunk_0042"
+    ],
+    "expected_keywords": [
+      "滚刷",
+      "胶刷",
+      "毛发"
+    ],
+    "note": "技术对比"
+  },
+  {
+    "id": "test_016",
+    "user_query": "机器人卡住了",
+    "relevant_doc_ids": [
+      "chunk_0034",
+      "chunk_0035"
+    ],
+    "expected_keywords": [
+      "卡住",
+      "障碍物",
+      "轮子"
+    ],
+    "note": "故障问题"
+  },
+  {
+    "id": "test_017",
+    "user_query": "冬天能用吗",
+    "relevant_doc_ids": [
+      "chunk_0083",
+      "chunk_0179",
+      "chunk_0329"
+    ],
+    "expected_keywords": [
+      "冬季",
+      "低温",
+      "电池"
+    ],
+    "note": "季节相关问题"
+  },
+  {
+    "id": "test_018",
+    "user_query": "夏天太热",
+    "relevant_doc_ids": [
+      "chunk_0085",
+      "chunk_0319",
+      "chunk_0335"
+    ],
+    "expected_keywords": [
+      "夏季",
+      "高温",
+      "充电"
+    ],
+    "note": "季节相关问题"
+  },
+  {
+    "id": "test_019",
+    "user_query": "建图不准",
+    "relevant_doc_ids": [
+      "chunk_0004",
+      "chunk_0005",
+      "chunk_0036"
+    ],
+    "expected_keywords": [
+      "建图",
+      "精度",
+      "传感器"
+    ],
+    "note": "技术问题"
+  },
+  {
+    "id": "test_020",
+    "user_query": "会迷路吗",
+    "relevant_doc_ids": [
+      "chunk_0001",
+      "chunk_0004",
+      "chunk_0005"
+    ],
+    "expected_keywords": [
+      "迷路",
+      "定位",
+      "传感器"
+    ],
+    "note": "口语化问题"
+  },
+  {
+    "id": "test_021",
+    "user_query": "充电发热",
+    "relevant_doc_ids": [
+      "chunk_0076",
+      "chunk_0083",
+      "chunk_0085"
+    ],
+    "expected_keywords": [
+      "充电",
+      "发热",
+      "电池"
+    ],
+    "note": "安全问题"
+  },
+  {
+    "id": "test_022",
+    "user_query": "续航多久",
+    "relevant_doc_ids": [
+      "chunk_0126",
+      "chunk_0127",
+      "chunk_0179"
+    ],
+    "expected_keywords": [
+      "续航",
+      "电池",
+      "使用时间"
+    ],
+    "note": "常见问题"
+  },
+  {
+    "id": "test_023",
+    "user_query": "边刷不转",
+    "relevant_doc_ids": [
+      "chunk_0113",
+      "chunk_0149",
+      "chunk_0190"
+    ],
+    "expected_keywords": [
+      "边刷",
+      "旋转",
+      "电机"
+    ],
+    "note": "故障问题"
+  },
+  {
+    "id": "test_024",
+    "user_query": "开机没反应",
+    "relevant_doc_ids": [
+      "chunk_0102",
+      "chunk_0139",
+      "chunk_0146"
+    ],
+    "expected_keywords": [
+      "开机",
+      "电源",
+      "电池"
+    ],
+    "note": "故障问题"
+  },
+  {
+    "id": "test_025",
+    "user_query": "充电指示灯闪",
+    "relevant_doc_ids": [
+      "chunk_0301",
+      "chunk_0302",
+      "chunk_0307"
+    ],
+    "expected_keywords": [
+      "充电",
+      "指示灯",
+      "触点"
+    ],
+    "note": "故障问题"
+  },
+  {
+    "id": "test_026",
+    "user_query": "自动洗拖布好用吗",
+    "relevant_doc_ids": [
+      "chunk_0019",
+      "chunk_0041",
+      "chunk_0042"
+    ],
+    "expected_keywords": [
+      "洗拖布",
+      "基站",
+      "自动"
+    ],
+    "note": "功能评价"
+  },
+  {
+    "id": "test_027",
+    "user_query": "水箱漏水",
+    "relevant_doc_ids": [
+      "chunk_0131",
+      "chunk_0211",
+      "chunk_0225"
+    ],
+    "expected_keywords": [
+      "水箱",
+      "漏水",
+      "密封圈"
+    ],
+    "note": "故障问题"
+  },
+  {
+    "id": "test_028",
+    "user_query": "能扫瓷砖吗",
+    "relevant_doc_ids": [
+      "chunk_0010",
+      "chunk_0011",
+      "chunk_0018"
+    ],
+    "expected_keywords": [
+      "瓷砖",
+      "地面",
+      "清洁"
+    ],
+    "note": "适用性问题"
+  },
+  {
+    "id": "test_029",
+    "user_query": "尘盒咋拆",
+    "relevant_doc_ids": [
+      "chunk_0029",
+      "chunk_0052",
+      "chunk_0106"
+    ],
+    "expected_keywords": [
+      "尘盒",
+      "拆卸",
+      "清理"
+    ],
+    "note": "操作问题"
+  },
+  {
+    "id": "test_030",
+    "user_query": "能识别家具吗",
+    "relevant_doc_ids": [
+      "chunk_0051",
+      "chunk_0152",
+      "chunk_0177"
+    ],
+    "expected_keywords": [
+      "避障",
+      "家具",
+      "传感器"
+    ],
+    "note": "功能问题"
+  },
+  {
+    "id": "test_031",
+    "user_query": "APP咋更新",
+    "relevant_doc_ids": [
+      "chunk_0154",
+      "chunk_0162",
+      "chunk_0181"
+    ],
+    "expected_keywords": [
+      "APP",
+      "更新",
+      "系统"
+    ],
+    "note": "操作问题"
+  },
+  {
+    "id": "test_032",
+    "user_query": "恢复出厂设置",
+    "relevant_doc_ids": [
+      "chunk_0109",
+      "chunk_0147",
+      "chunk_0182"
+    ],
+    "expected_keywords": [
+      "出厂设置",
+      "恢复",
+      "重置"
+    ],
+    "note": "操作问题"
+  },
+  {
+    "id": "test_033",
+    "user_query": "多楼层咋弄",
+    "relevant_doc_ids": [
+      "chunk_0025",
+      "chunk_0060",
+      "chunk_0080"
+    ],
+    "expected_keywords": [
+      "多楼层",
+      "地图",
+      "切换"
+    ],
+    "note": "功能问题"
+  },
+  {
+    "id": "test_034",
+    "user_query": "清扫面积不准",
+    "relevant_doc_ids": [
+      "chunk_0160",
+      "chunk_0195",
+      "chunk_0317"
+    ],
+    "expected_keywords": [
+      "面积",
+      "地图",
+      "标定"
+    ],
+    "note": "故障问题"
+  },
+  {
+    "id": "test_035",
+    "user_query": "儿童安全",
+    "relevant_doc_ids": [
+      "chunk_0078",
+      "chunk_0170",
+      "chunk_0304"
+    ],
+    "expected_keywords": [
+      "儿童",
+      "安全",
+      "禁区"
+    ],
+    "note": "安全问题"
+  },
+  {
+    "id": "test_036",
+    "user_query": "租房适合吗",
+    "relevant_doc_ids": [
+      "chunk_0171",
+      "chunk_0284"
+    ],
+    "expected_keywords": [
+      "小户型",
+      "清扫模式",
+      "定时"
+    ],
+    "note": "场景适用性"
+  },
+  {
+    "id": "test_037",
+    "user_query": "能吸豆子吗",
+    "relevant_doc_ids": [
+      "chunk_0006",
+      "chunk_0042",
+      "chunk_0043"
+    ],
+    "expected_keywords": [
+      "吸力",
+      "Pa",
+      "颗粒物"
+    ],
+    "note": "刁钻问题"
+  },
+  {
+    "id": "test_038",
+    "user_query": "dToF是什么",
+    "relevant_doc_ids": [
+      "chunk_0003",
+      "chunk_0004"
+    ],
+    "expected_keywords": [
+      "dToF",
+      "导航",
+      "测距"
+    ],
+    "note": "技术术语"
+  },
+  {
+    "id": "test_039",
+    "user_query": "有语音控制吗",
+    "relevant_doc_ids": [
+      "chunk_0021",
+      "chunk_0022",
+      "chunk_0026"
+    ],
+    "expected_keywords": [
+      "语音",
+      "助手",
+      "控制"
+    ],
+    "note": "功能问题"
+  },
+  {
+    "id": "test_040",
+    "user_query": "能设置禁区吗",
+    "relevant_doc_ids": [
+      "chunk_0015",
+      "chunk_0023",
+      "chunk_0304"
+    ],
+    "expected_keywords": [
+      "禁区",
+      "虚拟墙",
+      "APP"
+    ],
+    "note": "功能问题"
+  },
+  {
+    "id": "test_041",
+    "user_query": "越障高度多少",
+    "relevant_doc_ids": [
+      "chunk_0012",
+      "chunk_0161",
+      "chunk_0255"
+    ],
+    "expected_keywords": [
+      "越障",
+      "高度",
+      "门槛"
+    ],
+    "note": "参数问题"
+  },
+  {
+    "id": "test_042",
+    "user_query": "震动拖地有效吗",
+    "relevant_doc_ids": [
+      "chunk_0018"
+    ],
+    "expected_keywords": [
+      "震动",
+      "拖地",
+      "去污"
+    ],
+    "note": "功能效果"
+  },
+  {
+    "id": "test_043",
+    "user_query": "电控水箱好吗",
+    "relevant_doc_ids": [
+      "chunk_0017"
+    ],
+    "expected_keywords": [
+      "电控水箱",
+      "渗水",
+      "出水量"
+    ],
+    "note": "技术对比"
+  },
+  {
+    "id": "test_044",
+    "user_query": "复合滤网咋样",
+    "relevant_doc_ids": [
+      "chunk_0009",
+      "chunk_0030",
+      "chunk_0065"
+    ],
+    "expected_keywords": [
+      "滤网",
+      "HEPA",
+      "过滤"
+    ],
+    "note": "部件评价"
+  },
+  {
+    "id": "test_045",
+    "user_query": "双主刷好吗",
+    "relevant_doc_ids": [
+      "chunk_0010",
+      "chunk_0018",
+      "chunk_0020"
+    ],
+    "expected_keywords": [
+      "双主刷",
+      "清洁",
+      "地面"
+    ],
+    "note": "技术评价"
+  },
+  {
+    "id": "test_046",
+    "user_query": "划区清扫咋用",
+    "relevant_doc_ids": [
+      "chunk_0014",
+      "chunk_0021",
+      "chunk_0025"
+    ],
+    "expected_keywords": [
+      "划区",
+      "APP",
+      "地图"
+    ],
+    "note": "操作问题"
+  },
+  {
+    "id": "test_047",
+    "user_query": "清洁记录咋看",
+    "relevant_doc_ids": [
+      "chunk_0021",
+      "chunk_0024",
+      "chunk_0195"
+    ],
+    "expected_keywords": [
+      "清洁记录",
+      "APP",
+      "面积"
+    ],
+    "note": "操作问题"
+  },
+  {
+    "id": "test_048",
+    "user_query": "耗材提醒在哪",
+    "relevant_doc_ids": [
+      "chunk_0021",
+      "chunk_0022",
+      "chunk_0025"
+    ],
+    "expected_keywords": [
+      "耗材",
+      "提醒",
+      "APP"
+    ],
+    "note": "功能位置"
+  },
+  {
+    "id": "test_049",
+    "user_query": "能识别地毯增压吗",
+    "relevant_doc_ids": [
+      "chunk_0013",
+      "chunk_0043",
+      "chunk_0114"
+    ],
+    "expected_keywords": [
+      "地毯",
+      "增压",
+      "识别"
+    ],
+    "note": "功能问题"
+  },
+  {
+    "id": "test_050",
+    "user_query": "拖地抬滚刷吗",
+    "relevant_doc_ids": [
+      "chunk_0020",
+      "chunk_0119",
+      "chunk_0173"
+    ],
+    "expected_keywords": [
+      "滚刷",
+      "抬起",
+      "拖地"
+    ],
+    "note": "功能细节"
+  }
+]
