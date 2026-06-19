@@ -217,7 +217,7 @@ docker run -d -p 6379:6379 redis
 
 ```bash
 # 启动 Streamlit 前端
-streamlit run app.py
+streamlit run app.py --server.port 8501
 ```
 
 访问 **http://localhost:8501** 即可使用。
@@ -232,20 +232,12 @@ streamlit run app.py
 
 **首次运行时间**：约 5-10 分钟（取决于文档数量和网络速度）
 
----
-
-## 🧪 RAG 评估
-
-运行 RAG 评估脚本测试召回率和忠诚度：
+### 8. 运行 RAG 评估
 
 ```bash
+# 测试召回率和忠诚度
 python tests/rag_evaluation.py
 ```
-
-评估指标：
-- **召回率**: 测试用例能否正确检索到相关文档（Recall@1/3/5）
-- **MRR**: 平均倒数排名，衡量检索精度
-- **忠诚度**: 回答是否基于检索到的文档，无幻觉
 
 评估结果会保存到 `rag_evaluation_results.json`。
 
