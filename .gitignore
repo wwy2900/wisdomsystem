@@ -27,6 +27,7 @@ ENV/
 .env
 .env.local
 .env.*.local
+.env.backup
 
 # Vector store
 chroma_db/
@@ -54,3 +55,8 @@ rag_evaluation_results.json
 
 # Documentation (excluded from public repo)
 OPTIMIZATION_REPORT.md
+CHANGELOG.md
+PROJECT_IMPROVEMENT_PLAN.md
+
+# IDE internal
+.trae/

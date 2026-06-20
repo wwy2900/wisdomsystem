@@ -240,7 +240,15 @@ class RAGEvaluator:
 
 if __name__ == "__main__":
     import os
-    os.environ["DASHSCOPE_API_KEY"] = "sk-5f1e54884e644e828ced5f91ac54513d"
+    
+    api_key = os.environ.get("DASHSCOPE_API_KEY")
+    if not api_key:
+        print("❌ 错误：未配置 DASHSCOPE_API_KEY 环境变量")
+        print("请设置环境变量后再运行：")
+        print("  Linux/Mac: export DASHSCOPE_API_KEY=your_api_key")
+        print("  Windows: set DASHSCOPE_API_KEY=your_api_key")
+        print("或在 .env 文件中配置 DASHSCOPE_API_KEY")
+        exit(1)
 
     evaluator = RAGEvaluator()
 

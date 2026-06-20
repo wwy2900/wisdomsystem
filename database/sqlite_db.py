@@ -1,7 +1,9 @@
 import sqlite3
 import os
+import json
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+from utils.logger_handler import logger
 
 
 # 单例模式：避免重复初始化数据库连接
@@ -23,6 +25,24 @@ class SQLiteDatabase:
         self.db_path = db_path
         self._init_tables()
         self._initialized = True
+
+    def _safe_json_parse(self, value: str, default=None):
+        """安全解析JSON字符串，失败时返回默认值并记录日志"""
+        if not value:
+            return default
+        
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            # 尝试兼容旧格式（eval格式）
+            try:
+                import ast
+                result = ast.literal_eval(value)
+                logger.warning(f"[SQLite] 检测到旧格式数据，已自动迁移: {value[:50]}...")
+                return result
+            except (SyntaxError, ValueError):
+                logger.error(f"[SQLite] JSON解析失败，值: {value[:50]}...")
+                return default
 
     def _init_tables(self):
         with sqlite3.connect(self.db_path) as conn:
@@ -64,7 +84,7 @@ class SQLiteDatabase:
                 user_id,
                 data.get('name'),
                 data.get('occupation'),
-                str(data.get('preferences', {})),
+                json.dumps(data.get('preferences', {}), ensure_ascii=False),
                 datetime.now().isoformat(),
                 datetime.now().isoformat()
             ))
@@ -80,7 +100,7 @@ class SQLiteDatabase:
                     'user_id': row[0],
                     'name': row[1],
                     'occupation': row[2],
-                    'preferences': eval(row[3]),
+                    'preferences': self._safe_json_parse(row[3], {}),
                     'created_at': row[4],
                     'updated_at': row[5]
                 }
@@ -98,8 +118,8 @@ class SQLiteDatabase:
                 summary_id,
                 user_id,
                 session_id,
-                str(keywords),
-                str(topics),
+                json.dumps(keywords, ensure_ascii=False),
+                json.dumps(topics, ensure_ascii=False),
                 summary_text,
                 datetime.now().isoformat()
             ))
@@ -118,8 +138,8 @@ class SQLiteDatabase:
                 'summary_id': row[0],
                 'user_id': row[1],
                 'session_id': row[2],
-                'keywords': eval(row[3]),
-                'topics': eval(row[4]),
+                'keywords': self._safe_json_parse(row[3], []),
+                'topics': self._safe_json_parse(row[4], []),
                 'summary_text': row[5],
                 'created_at': row[6]
             } for row in rows]

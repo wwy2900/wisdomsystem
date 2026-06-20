@@ -8,15 +8,17 @@
 
 ### 🔍 高级 RAG 检索
 
-| 技术 | 说明 | 效果 |
+| 技术 | 状态 | 说明 |
 |------|------|------|
-| **Contextual Retrieval** | 为每个 chunk 添加上下文描述（章节、主题、摘要），解决孤立chunk丢失文档上下文的问题 | Recall@5 提升至 90% |
-| **Query 改写** | 三路改写：同义替换版、句式转换版、意图补全版 | 覆盖口语化/刁钻提问 |
-| **语义校验** | 确保改写后的 Query 与原问题语义相似度 ≥ 0.8，避免偏离意图 | 过滤无效改写 |
-| **快速相似度预过滤** | 使用字符重叠率、长度比率、关键词重叠快速过滤低相似度文本 | 减少API调用次数 |
-| **BM25 混合召回** | 结合向量语义检索与 BM25 关键词匹配，使用 jieba 中文分词 | 兼顾语义和关键词 |
-| **RRF 融合** | Reciprocal Rank Fusion 算法融合多源检索结果 | 优化排序结果 |
-| **Rerank 精排** | 基于语义相似度的最终排序，支持批量嵌入计算 | 过滤无关文档 |
+| **Contextual Retrieval** | ✅ 已实现 | 为每个 chunk 添加上下文描述（章节、主题、摘要） |
+| **Query 改写** | ✅ 已实现 | 三路改写：同义替换版、句式转换版、意图补全版 |
+| **语义校验** | ✅ 已实现 | 确保改写后的 Query 与原问题语义相似度 ≥ 0.8 |
+| **快速相似度预过滤** | ✅ 已实现 | 使用字符重叠率、长度比率、关键词重叠快速过滤 |
+| **BM25 混合召回** | ✅ 已实现 | 结合向量语义检索与 BM25 关键词匹配 |
+| **中文分词优化** | ⏳ 计划中 | 将 `.split()` 替换为 jieba 分词 |
+| **RRF 融合** | ✅ 已实现 | Reciprocal Rank Fusion 算法融合多源检索结果 |
+| **Rerank 精排** | ✅ 已实现 | 基于语义相似度的最终排序 |
+| **批量 embedding** | ⏳ 计划中 | 优化 Rerank 调用效率 |
 
 **检索流程**：
 ```
@@ -27,31 +29,51 @@
 
 | 层级 | 类型 | 存储方式 | 用途 |
 |------|------|---------|------|
-| Layer 1 | 当前上下文 | 截断式 | 短期对话上下文 |
-| Layer 2 | 用户档案 | SQLite | 用户姓名、职业、偏好等结构化信息 |
-| Layer 3 | 近期摘要 | SQLite/Redis | 轻量级关键词提取 |
+| Layer 1 | 当前上下文 | Redis/内存缓存 | 短期对话上下文（最近10条消息） |
+| Layer 2 | 用户档案 | SQLite + Redis缓存 | 用户姓名、职业、偏好等结构化信息 |
+| Layer 3 | 近期摘要 | SQLite + Redis缓存 | 轻量级关键词提取 |
 | Layer 4 | 长期经验 | RAG 向量库 | 成功案例、失败尝试 |
 
 ### 💬 断点续聊
 
-- 支持会话持久化存储（文件 + Redis）
-- 跨会话记忆恢复，自动加载最近历史会话
-- 用户画像自动更新
-- 历史记录自动保存和加载
+- ✅ 支持会话持久化存储（文件 + Redis）
+- ✅ 跨会话记忆恢复，自动加载最近历史会话
+- ✅ 用户画像自动更新
+- ✅ 历史记录自动保存和加载
 
 ### ⚡ 性能优化
 
-| 优化项 | 效果 |
-|--------|------|
-| **单例模式** | 所有核心组件采用单例模式，避免重复初始化 |
-| **懒加载模型** | 启动时间优化 |
-| **Redis 缓存** | RAG 结果缓存，默认 24 小时过期 |
-| **Query 缓存** | 缓存命中时响应时间显著降低 |
-| **系统消息优化** | 修复多系统消息冲突问题 |
+| 优化项 | 状态 | 说明 |
+|--------|------|------|
+| **单例模式** | ✅ 已实现 | 所有核心组件采用单例模式，避免重复初始化 |
+| **Redis 缓存** | ✅ 已实现 | 用户画像和会话摘要缓存，默认 24 小时过期 |
+| **Redis 降级** | ✅ 已实现 | Redis 不可用时自动降级到内存缓存，带日志提示 |
+| **记忆写入优化** | ✅ 已实现 | 流式输出时只在完整回答后写入一次记忆 |
+| **系统消息优化** | ✅ 已实现 | 修复多系统消息冲突问题 |
+
+### 🔧 工具系统
+
+| 工具 | 说明 |
+|------|------|
+| `rag_summarize` | 从向量存储中检索参考资料 |
+| `get_weather` | 获取指定城市的天气信息 |
+| `get_user_location` | 获取用户所在城市（当前使用默认值） |
+| `get_user_id` | 获取用户ID（当前使用默认值） |
+| `get_current_month` | 获取当前月份 |
+| `fetch_external_data` | 获取用户使用记录数据 |
+| `fill_context_for_report` | 触发报告生成上下文注入 |
+
+### 🛡️ 安全特性
+
+- ✅ SQL 注入防护：使用 JSON 解析替代 `eval`
+- ✅ 敏感信息保护：API Key 通过环境变量配置
+- ✅ 输入验证：工具参数类型注解和校验
 
 ---
 
 ## 📊 RAG 评估结果
+
+**当前测试结果（基于 50 个刁钻测试用例）：**
 
 | 指标 | 结果 |
 |------|------|
@@ -61,7 +83,10 @@
 | **MRR** | 0.712 |
 | **忠诚度** | 100% |
 
-测试用例：50 个真实用户刁钻提问（口语化、简短、不标准）
+**运行评估命令：**
+```bash
+python tests/rag_evaluation.py
+```
 
 ---
 
@@ -74,8 +99,10 @@
 | **向量数据库** | ChromaDB | 0.5.15 |
 | **前端** | Streamlit | 1.40.1 |
 | **LLM** | 通义千问 (DashScope) | - |
-| **缓存** | Redis / SimpleCache | - |
+| **缓存** | Redis / SimpleCache | 5.0.1 |
 | **数据库** | SQLite | - |
+| **数值计算** | NumPy | 1.26.4 |
+| **中文分词** | jieba | 0.42.1 |
 
 ---
 
@@ -86,12 +113,12 @@ WisdomSystem/
 ├── agent/                  # ReAct Agent 核心
 │   ├── tools/              # 工具定义
 │   │   ├── agent_tools.py  # 业务工具（RAG检索、天气查询等）
-│   │   └── middleware.py   # 中间件（日志、提示词注入）
+│   │   └── middleware.py   # 中间件（工具监控、提示词切换）
 │   └── react_agent.py      # ReAct Agent 实现（流式输出）
 ├── rag/                    # RAG 检索模块
-│   ├── contextual_enhancer.py  # Contextual Retrieval（上下文增强）
+│   ├── contextual_enhancer.py  # Contextual Retrieval
 │   ├── question_splitter.py    # 按问题切分文档
-│   ├── query_rewriter.py       # Query 改写（三路改写 + 语义校验）
+│   ├── query_rewriter.py       # Query 改写
 │   ├── semantic_checker.py     # 语义相似度校验
 │   ├── bm25_retriever.py       # BM25 检索
 │   ├── rrf_fusion.py           # RRF 融合算法
@@ -103,8 +130,8 @@ WisdomSystem/
 │   ├── memory_manager.py   # 记忆管理器（单例模式）
 │   └── session_manager.py  # 会话管理
 ├── database/               # 数据库模块
-│   ├── sqlite_db.py        # SQLite 数据存储（单例模式）
-│   └── redis_cache.py      # Redis 缓存（单例模式，降级到内存缓存）
+│   ├── sqlite_db.py        # SQLite 数据存储（单例模式，JSON解析）
+│   └── redis_cache.py      # Redis 缓存（单例模式，支持降级）
 ├── model/                  # 模型工厂
 │   └── factory.py          # 通义千问模型初始化
 ├── config/                 # 配置文件
@@ -118,7 +145,7 @@ WisdomSystem/
 │   └── report_prompt.txt   # 报告生成提示词
 ├── data/                   # 知识库文档
 │   ├── external/           # 外部数据
-│   │   └── records.csv     # 用户使用记录
+│   │   └── records.csv     # 用户使用记录（CSV格式）
 │   ├── 扫地机器人100问.pdf
 │   ├── 扫地机器人100问2.txt
 │   ├── 扫拖一体机器人100问.txt
@@ -126,7 +153,7 @@ WisdomSystem/
 │   ├── 维护保养.txt
 │   └── 选购指南.txt
 ├── tests/                  # 测试模块
-│   ├── rag_evaluation.py   # RAG 评估脚本
+│   ├── rag_evaluation.py   # RAG 评估脚本（需配置API Key）
 │   └── test_cases.json     # 测试用例（50个）
 ├── utils/                  # 工具函数
 │   ├── config_handler.py   # 配置加载
@@ -134,8 +161,8 @@ WisdomSystem/
 │   ├── logger_handler.py   # 日志处理
 │   └── path_tool.py        # 路径工具
 ├── app.py                  # Streamlit 前端入口
-├── requirements.txt        # 依赖清单
-├── .env                    # 环境变量配置（需自行配置）
+├── requirements.txt        # 依赖清单（包含所有必需依赖）
+├── .env                    # 环境变量配置（需自行配置，不提交）
 ├── AGENTS.md               # Agent 系统设计文档
 └── README.md               # 项目说明文档
 ```
@@ -235,7 +262,13 @@ streamlit run app.py --server.port 8501
 ### 8. 运行 RAG 评估
 
 ```bash
-# 测试召回率和忠诚度
+# 设置环境变量（Windows）
+set DASHSCOPE_API_KEY=your_api_key_here
+
+# 设置环境变量（Linux/Mac）
+export DASHSCOPE_API_KEY=your_api_key_here
+
+# 运行评估
 python tests/rag_evaluation.py
 ```
 
@@ -299,3 +332,4 @@ MIT License
 
 **文档说明**：
 - `AGENTS.md` - Agent 系统设计文档，包含架构说明和扩展指南
+- `PROJECT_IMPROVEMENT_PLAN.md` - 项目改进计划，包含待办事项和验收标准

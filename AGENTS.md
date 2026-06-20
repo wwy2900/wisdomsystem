@@ -109,11 +109,11 @@ Agent 系统目前提供以下 7 个工具：
 |---------|---------|---------|--------|------|
 | rag_summarize | 从向量存储中检索参考资料 | query: 查询问题 | 检索结果摘要 | RAG增强回答 |
 | get_weather | 获取指定城市的天气信息 | city: 城市名称 | 天气描述文本 | 天气查询场景 |
-| get_user_location | 获取用户所在城市 | 无参数 | 城市名称 | 用户定位 |
-| get_user_id | 获取用户ID | 无参数 | 用户ID字符串 | 用户识别 |
-| get_current_month | 获取当前月份 | 无参数 | 月份字符串 | 时间相关功能 |
-| fetch_external_data | 获取用户使用记录 | user_id: 用户ID<br>month: 月份 | 使用记录数据 | 数据查询场景 |
-| fill_context_for_report | 触发报告生成上下文注入 | 无参数 | 调用确认 | 报告生成场景 |
+| get_user_location | 获取用户所在城市 | 无参数 | 城市名称（当前为默认值"深圳"） | 用户定位 |
+| get_user_id | 获取用户ID | 无参数 | 用户ID字符串（当前为默认值"1001"） | 用户识别 |
+| get_current_month | 获取当前月份 | 无参数 | 月份字符串（格式：YYYY-MM，取系统当前时间） | 时间相关功能 |
+| fetch_external_data | 获取用户使用记录 | user_id: 用户ID<br>month: 月份 | JSON格式使用记录字符串 | 数据查询场景 |
+| fill_context_for_report | 触发报告生成上下文注入 | 无参数 | 调用确认字符串 | 报告生成场景 |
 
 ### 3.2 工具注册机制
 
@@ -156,13 +156,15 @@ fetch_external_data 工具从外部 CSV 文件加载用户使用记录数据。
 
 ### 4.1 中间件列表
 
-系统提供 3 个中间件用于监控和增强 Agent 执行过程：
+系统提供 3 个中间件用于监控和增强 Agent 执行过程，采用纯 Python 闭包函数实现（兼容当前 LangGraph 版本）：
 
-| 中间件名称 | 装饰器类型 | 执行时机 | 功能说明 |
-|-----------|----------|---------|---------|
-| monitor_tool | wrap_tool_call | 工具调用前后 | 记录工具调用日志，检测报告生成场景 |
-| log_before_model | before_model | 模型调用前 | 记录模型调用信息和消息数量 |
-| report_prompt_switch | dynamic_prompt | 提示词生成前 | 根据上下文动态切换系统提示词 |
+| 中间件名称 | 实现方式 | 执行时机 | 功能说明 |
+|-----------|---------|---------|---------|
+| monitor_tool | 闭包函数 | 工具调用前后 | 记录工具调用日志，检测报告生成场景 |
+| log_before_model | 闭包函数 | 模型调用前 | 记录模型调用信息和消息数量 |
+| report_prompt_switch | 闭包函数 | 提示词生成前 | 根据上下文动态切换系统提示词 |
+
+**注意：** 中间件在 ReactAgent 初始化时通过 \_setup_middleware()\ 方法注册。如果当前 LangGraph 版本不支持 \middlewares\ 属性，会记录 warning 并跳过，不影响正常运行。
 
 ### 4.2 执行顺序
 
@@ -251,11 +253,18 @@ fetch_external_data 工具从外部 CSV 文件加载用户使用记录数据。
 
 | 依赖 | 版本要求 | 用途说明 |
 |-----|---------|---------|
-| langchain | >=0.1.0 | 核心LLM框架 |
-| langgraph | >=0.0.20 | Agent执行引擎 |
-| langchain-dashscope | >=0.0.1 | 阿里云通义千问集成 |
-| chromadb | >=0.4.0 | 向量数据库 |
-| redis | >=5.0.0 | 缓存层 |
+| langchain | 0.3.7 | 核心LLM框架 |
+| langgraph | 0.2.50 | Agent执行引擎 |
+| langchain-community | 0.3.7 | 社区集成 |
+| langchain-chroma | 0.1.4 | ChromaDB集成 |
+| chromadb | 0.5.15 | 向量数据库 |
+| streamlit | 1.40.1 | Web前端 |
+| dashscope | 1.20.14 | 阿里云通义千问 |
+| redis | 5.0.1 | 缓存层 |
+| rank_bm25 | 0.2.2 | BM25检索 |
+| numpy | 1.26.4 | 数值计算 |
+| jieba | 0.42.1 | 中文分词 |
+| python-dotenv | 1.0.0 | 环境变量管理 |
 
 ### 6.2 环境变量配置
 
@@ -304,20 +313,20 @@ streamlit run app.py --server.runOnSave=true
 
 ### 7.2 添加新中间件
 
-**步骤一：选择装饰器类型**
-- before_model：模型调用前执行
-- dynamic_prompt：提示词生成前执行
-- wrap_tool_call：工具调用时执行
+**步骤一：选择执行时机**
+- 模型调用前：在模型推理前执行日志或预处理
+- 提示词生成前：动态切换提示词
+- 工具调用时：监控工具执行过程
 
 **步骤二：实现中间件逻辑**
-- 创建中间件函数
-- 添加对应的装饰器
-- 编写执行逻辑
-- 返回适当的值
+- 在 agent/tools/middleware.py 中创建闭包函数
+- 使用 create_xxx() 工厂函数返回内部函数
+- 编写执行逻辑并返回适当的值
 
-**步骤三：配置生效**
+**步骤三：注册中间件**
+- 在 agent/react_agent.py 的 _setup_middleware() 方法中添加注册
 - 确保中间件函数被正确导入
-- 中间件会自动生效，无需额外配置
+- 检查 LangGraph 版本兼容性
 
 ### 7.3 扩展提示词
 
@@ -390,11 +399,12 @@ streamlit run app.py --server.runOnSave=true
 |-----|------|---------|
 | v1.0 | 初始版本 | 基础Agent框架，包含核心对话功能和工具系统 |
 | v1.1 | 2026-06-19 | 单例模式优化，提升响应速度；修复系统消息冲突问题；改进性能表现 |
+| v1.2 | 2026-06-19 | 安全修复（移除硬编码Key、eval改JSON）；Agent稳定性（流式输出修复、中间件接入、工具返回值修正）；CSV解析改进；依赖补齐 |
 
 ---
 
 **文档生成日期：** 2026-06-19
 
-**适用版本：** v1.1
+**适用版本：** v1.2
 
 **维护负责人：** 项目开发团队
