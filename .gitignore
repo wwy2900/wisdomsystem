@@ -54,10 +54,9 @@ rag_evaluation_results.json
 *.bak
 *.cache
 
-# Documentation (excluded from public repo)
-OPTIMIZATION_REPORT.md
-CHANGELOG.md
-PROJECT_IMPROVEMENT_PLAN.md
+# Documentation (only README.md is public)
+*.md
+!README.md
 
 # IDE internal
 .trae/
