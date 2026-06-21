@@ -1,410 +1,251 @@
-# Agent 系统设计文档
+# Agent 系统关键说明
 
-## 概述
-
-本文档描述了"智扫通·智能客服"项目中 Agent 系统的架构设计、组件说明和使用规范，旨在为项目长期维护提供参考。
+本文档记录“智扫通·智能客服”项目中 Agent、FastAPI、RAG、记忆和知识库管理的核心维护信息。详细变更和规划见 `README.md`、`PROJECT_IMPROVEMENT_PLAN.md`、`NEXT_OPTIMIZATION_AND_FEATURE_PLAN.md`。
 
 ---
 
-## 目录
+## 1. 系统架构
 
-1. [Agent 架构](#1-agent-架构)
-2. [ReactAgent 核心类](#2-reactagent-核心类)
-3. [工具系统](#3-工具系统)
-4. [中间件系统](#4-中间件系统)
-5. [执行流程](#5-执行流程)
-6. [配置与部署](#6-配置与部署)
-7. [扩展指南](#7-扩展指南)
+项目采用分层结构：
 
----
-
-## 1. Agent 架构
-
-### 1.1 系统分层
-
-Agent 系统采用分层架构设计，从上到下依次为：
-
-**用户接口层**
-- 负责与用户交互
-- 基于 Streamlit Web 框架实现
-- 提供实时对话界面
-
-**核心智能体层**
-- ReactAgent：核心智能体，协调整个对话流程
-- System Prompt：系统提示词，定义智能体行为规范
-- Memory Manager：四层记忆管理器，维护对话上下文
-
-**工具层**
-- 提供智能体调用外部能力
-- 包含 RAG 检索、天气查询、用户信息获取等功能
-
-**中间件层**
-- 工具调用监控：记录工具执行日志
-- 模型调用前日志：监控模型调用状态
-- 动态提示词切换：根据场景自动切换提示词
-
-### 1.2 核心组件说明
-
-| 组件 | 职责 | 文件位置 | 设计模式 |
-|-----|------|---------|---------|
-| ReactAgent | 核心智能体，协调整个对话流程 | agent/react_agent.py | 单例模式 |
-| MemoryManager | 四层记忆管理（L1-L4） | memory/memory_manager.py | 单例模式 |
-| RagSummarizeService | 向量检索与摘要生成 | rag/rag_service.py | 单例模式 |
-| Agent Tools | 外部工具调用能力 | agent/tools/agent_tools.py | 装饰器模式 |
-| Middleware | 执行过程监控与增强 | agent/tools/middleware.py | 装饰器模式 |
+| 层级 | 说明 | 关键文件 |
+| --- | --- | --- |
+| 用户界面层 | Streamlit 聊天页和知识库管理页 | `app.py` |
+| API 服务层 | FastAPI 后端、鉴权、SSE 流式接口 | `api/main.py`, `api/routes/` |
+| 服务层 | 封装聊天和知识库业务逻辑 | `services/chat_service.py`, `services/knowledge_service.py` |
+| Agent 层 | ReAct Agent 推理、工具调用、流式输出 | `agent/react_agent.py` |
+| 工具层 | RAG、天气、用户信息、外部数据、报告触发 | `agent/tools/agent_tools.py` |
+| 记忆层 | L1-L4 四层记忆、用户画像、会话摘要 | `memory/` |
+| RAG 层 | 向量检索、BM25、Query 改写、Rerank | `rag/` |
+| 存储层 | Redis/SimpleCache、SQLite、ChromaDB | `database/`, `chroma_db/` |
 
 ---
 
-## 2. ReactAgent 核心类
+## 2. 核心组件
 
-### 2.1 功能职责
+| 组件 | 职责 | 文件 |
+| --- | --- | --- |
+| `ReactAgent` | 核心智能体，负责对话推理、工具调用和流式输出 | `agent/react_agent.py` |
+| `ChatService` | FastAPI 和上层调用复用的聊天服务 | `services/chat_service.py` |
+| `KnowledgeService` | 知识库上传、检索、删除、重建服务 | `services/knowledge_service.py` |
+| `MemoryManager` | 四层记忆统一入口 | `memory/memory_manager.py` |
+| `RagSummarizeService` | RAG 检索和摘要生成 | `rag/rag_service.py` |
+| `VectorStoreService` | ChromaDB 向量库操作和知识库 chunk 管理 | `rag/vector_store.py` |
+| `RedisCache` | Redis 缓存，失败时降级到内存缓存 | `database/redis_cache.py` |
+| `SessionManager` | 会话创建、保存、加载和历史列表 | `memory/session_manager.py` |
 
-ReactAgent 是整个系统的核心智能体，负责：
-- 接收用户输入的查询
-- 协调记忆管理器获取上下文
-- 调用 LangGraph React Agent 执行推理
-- 管理工具调用流程
-- 流式返回回答结果
-
-### 2.2 核心方法
-
-| 方法 | 功能说明 | 参数说明 | 返回值说明 |
-|-----|---------|---------|-----------|
-| `__init__()` | 初始化Agent | 无 | 无 |
-| `execute_stream()` | 执行用户查询并流式返回回答 | query: 用户问题<br>user_id: 用户ID<br>session_id: 会话ID | 生成器，逐段返回回答内容 |
-
-### 2.3 单例模式说明
-
-为避免重复初始化带来的性能开销，ReactAgent 采用单例模式设计：
-- 全局只保留一个实例
-- 首次访问时创建实例并初始化
-- 后续访问直接返回已有实例
-
-**设计目的：**
-- 避免重复创建 LangChain 模型实例
-- 减少内存占用
-- 提升响应速度
-- 避免重复初始化重型组件
-
-### 2.4 系统提示词管理
-
-系统提示词通过专门的提示词加载器动态加载，支持：
-- 热更新：修改提示词文件后自动生效
-- 场景切换：根据不同场景使用不同提示词
-- 上下文注入：自动合并记忆上下文
-
-### 2.5 记忆上下文集成
-
-每次执行查询前，Agent 会自动从 MemoryManager 获取四层记忆上下文，并将其合并到系统提示词中，确保智能体能够理解对话历史。
+核心组件大多采用单例或服务封装，目的是避免重复初始化模型、向量库、数据库连接等重型资源。
 
 ---
 
-## 3. 工具系统
+## 3. FastAPI 接口
 
-### 3.1 工具列表
+FastAPI 入口：`api/main.py`
 
-Agent 系统目前提供以下 7 个工具：
+启动命令：
 
-| 工具名称 | 功能描述 | 输入参数 | 输出说明 | 用途 |
-|---------|---------|---------|--------|------|
-| rag_summarize | 从向量存储中检索参考资料 | query: 查询问题 | 检索结果摘要 | RAG增强回答 |
-| get_weather | 获取指定城市的天气信息 | city: 城市名称 | 天气描述文本 | 天气查询场景 |
-| get_user_location | 获取用户所在城市 | 无参数 | 城市名称（当前为默认值"深圳"） | 用户定位 |
-| get_user_id | 获取用户ID | 无参数 | 用户ID字符串（当前为默认值"1001"） | 用户识别 |
-| get_current_month | 获取当前月份 | 无参数 | 月份字符串（格式：YYYY-MM，取系统当前时间） | 时间相关功能 |
-| fetch_external_data | 获取用户使用记录 | user_id: 用户ID<br>month: 月份 | JSON格式使用记录字符串 | 数据查询场景 |
-| fill_context_for_report | 触发报告生成上下文注入 | 无参数 | 调用确认字符串 | 报告生成场景 |
-
-### 3.2 工具注册机制
-
-工具使用 @tool 装饰器注册，通过 LangChain 的工具管理系统统一管理。
-
-### 3.3 工具使用约束
-
-**命名规范**
-- 使用下划线命名法（snake_case）
-- 使用清晰的动词命名
-- 避免使用缩写或模糊名称
-
-**参数规范**
-- 必须有明确的类型注解
-- 必须有清晰的参数描述
-- 建议提供参数校验逻辑
-
-**返回值规范**
-- 返回值必须是字符串类型
-- 错误情况返回空字符串或错误描述
-- 避免返回复杂数据结构
-
-**异常处理**
-- 内部异常需要捕获并处理
-- 返回有意义的错误信息
-- 记录错误日志便于排查
-
-### 3.4 外部数据加载
-
-fetch_external_data 工具从外部 CSV 文件加载用户使用记录数据。
-
-**数据格式要求：**
-- 文件编码：UTF-8
-- 列顺序：user_id, 特征, 效率, 耗材, 对比, 时间
-- 文件路径：通过配置文件指定
-
----
-
-## 4. 中间件系统
-
-### 4.1 中间件列表
-
-系统提供 3 个中间件用于监控和增强 Agent 执行过程，采用纯 Python 闭包函数实现（兼容当前 LangGraph 版本）：
-
-| 中间件名称 | 实现方式 | 执行时机 | 功能说明 |
-|-----------|---------|---------|---------|
-| monitor_tool | 闭包函数 | 工具调用前后 | 记录工具调用日志，检测报告生成场景 |
-| log_before_model | 闭包函数 | 模型调用前 | 记录模型调用信息和消息数量 |
-| report_prompt_switch | 闭包函数 | 提示词生成前 | 根据上下文动态切换系统提示词 |
-
-**注意：** 中间件在 ReactAgent 初始化时通过 \_setup_middleware()\ 方法注册。如果当前 LangGraph 版本不支持 \middlewares\ 属性，会记录 warning 并跳过，不影响正常运行。
-
-### 4.2 执行顺序
-
-中间件按照以下顺序执行：
-
-1. 用户发送请求
-2. log_before_model：记录即将调用的模型信息
-3. report_prompt_switch：根据上下文选择合适的提示词
-4. 模型开始推理
-5. 如需调用工具：monitor_tool 监控工具执行
-6. 返回最终结果
-
-### 4.3 报告生成场景检测
-
-系统能够自动检测报告生成场景：
-
-**触发条件：** 当 monitor_tool 检测到调用 fill_context_for_report 工具时
-
-**后续动作：** 设置运行时上下文标记，后续自动切换到报告生成专用提示词
-
-### 4.4 动态提示词切换
-
-中间件支持根据场景动态切换提示词：
-
-**默认场景：** 使用通用客服提示词
-**报告场景：** 使用报告生成专用提示词
-
-切换逻辑由 report_prompt_switch 中间件实现，通过检测运行时上下文中的报告场景标记来决定使用哪个提示词。
-
----
-
-## 5. 执行流程
-
-### 5.1 完整执行流程
-
-**第一步：获取记忆上下文**
-- 调用 MemoryManager 的 build_full_context 方法
-- 合并 L1-L4 四层记忆
-- 构建完整的上下文信息
-
-**第二步：构建系统提示词**
-- 加载基础系统提示词
-- 合并记忆上下文
-- 组装完整的系统消息
-
-**第三步：执行中间件（前）**
-- 调用 log_before_model 记录日志
-- 调用 report_prompt_switch 选择提示词
-
-**第四步：Agent 执行推理**
-- LangGraph React Agent 开始工作
-- 分析用户问题
-- 决定是否需要调用工具
-- 生成初始回答
-
-**第五步：工具调用（如需要）**
-- 如果需要调用工具，触发 monitor_tool
-- 执行相应的工具函数
-- 记录工具调用日志
-
-**第六步：流式返回结果**
-- 逐段生成回答内容
-- 实时返回给前端展示
-- 保存回答到记忆管理器
-
-**第七步：保存对话记录**
-- 将用户消息保存到记忆
-- 将助手回答保存到记忆
-- 更新会话状态
-
-### 5.2 关键数据流转
-
-| 阶段 | 数据类型 | 说明 |
-|-----|---------|------|
-| 用户输入 | 字符串 | 用户输入的查询问题 |
-| 上下文构建 | 字符串 | 四层记忆合并后的上下文 |
-| 消息构建 | 消息列表 | 系统消息和用户消息的组合 |
-| 工具调用 | 工具请求 | 包含工具名称和参数的对象 |
-| 最终输出 | 生成器 | 逐段返回的流式内容 |
-
----
-
-## 6. 配置与部署
-
-### 6.1 核心依赖
-
-| 依赖 | 版本要求 | 用途说明 |
-|-----|---------|---------|
-| langchain | 0.3.7 | 核心LLM框架 |
-| langgraph | 0.2.50 | Agent执行引擎 |
-| langchain-community | 0.3.7 | 社区集成 |
-| langchain-chroma | 0.1.4 | ChromaDB集成 |
-| chromadb | 0.5.15 | 向量数据库 |
-| streamlit | 1.40.1 | Web前端 |
-| dashscope | 1.20.14 | 阿里云通义千问 |
-| redis | 5.0.1 | 缓存层 |
-| rank_bm25 | 0.2.2 | BM25检索 |
-| numpy | 1.26.4 | 数值计算 |
-| jieba | 0.42.1 | 中文分词 |
-| python-dotenv | 1.0.0 | 环境变量管理 |
-
-### 6.2 环境变量配置
-
-项目使用 .env 文件管理配置：
-
-**必填配置：**
-- DASHSCOPE_API_KEY：通义千问 API 密钥
-
-**可选配置：**
-- REDIS_HOST：Redis 服务器地址，默认 localhost
-- REDIS_PORT：Redis 端口，默认 6379
-- REDIS_DB：Redis 数据库编号，默认 0
-
-### 6.3 启动方式
-
-**标准启动：**
 ```bash
-streamlit run app.py
+uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**开发模式：**
+接口文档：
+
+```text
+http://localhost:8000/docs
+```
+
+### 聊天与会话
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/health` | 健康检查 |
+| POST | `/api/v1/sessions` | 创建会话 |
+| GET | `/api/v1/users/{user_id}/sessions` | 查询用户历史会话 |
+| GET | `/api/v1/sessions/{session_id}` | 查询会话详情 |
+| POST | `/api/v1/chat` | 非流式聊天 |
+| POST | `/api/v1/chat/stream` | SSE 流式聊天 |
+
+### 知识库管理
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/v1/knowledge/documents/upload` | 上传 `.txt` / `.pdf` 并立即入库 |
+| GET | `/api/v1/knowledge/chunks` | 分页查看 chunk |
+| GET | `/api/v1/knowledge/search` | 检索预览 |
+| DELETE | `/api/v1/knowledge/chunks/{doc_id}` | 删除指定 chunk，不删除原始文件 |
+| POST | `/api/v1/knowledge/rebuild` | 清空并重建索引 |
+
+除 `/health` 外，业务接口复用 `X-API-Key` 鉴权，密钥来自 `FASTAPI_API_KEY`。
+
+---
+
+## 4. Agent 工具
+
+当前 Agent 工具：
+
+| 工具 | 说明 |
+| --- | --- |
+| `rag_summarize` | 从向量库检索资料并生成摘要 |
+| `get_weather` | 返回指定城市天气信息 |
+| `get_user_location` | 返回用户城市，当前为默认值 |
+| `get_user_id` | 返回用户 ID，当前为默认值 |
+| `get_current_month` | 返回当前月份，格式 `YYYY-MM` |
+| `fetch_external_data` | 从 CSV 获取用户使用记录，返回 JSON 字符串 |
+| `fill_context_for_report` | 触发报告生成上下文注入 |
+
+工具约束：
+
+- 使用 `@tool` 注册。
+- 参数必须有类型注解。
+- 返回值统一为字符串。
+- 复杂结构返回 JSON 字符串。
+- 工具内部捕获异常并记录日志。
+
+---
+
+## 5. 记忆与 RAG
+
+### 四层记忆
+
+| 层级 | 类型 | 存储 |
+| --- | --- | --- |
+| L1 | 当前对话上下文 | Redis / SimpleCache |
+| L2 | 用户画像 | SQLite + Redis |
+| L3 | 近期摘要 | SQLite + Redis |
+| L4 | 长期经验 | RAG 向量库 |
+
+### RAG 流程
+
+```text
+用户问题
+→ Query 改写
+→ 语义校验
+→ 向量检索 + BM25 检索
+→ RRF 融合
+→ Rerank 精排
+→ 生成回答
+```
+
+知识库文件默认来自：
+
+- `data/`
+- `data/knowledge_uploads/`
+
+上传目录已加入 `.gitignore`，避免误提交用户上传资料。
+
+---
+
+## 6. 配置与依赖
+
+核心配置：
+
+| 配置 | 说明 |
+| --- | --- |
+| `DASHSCOPE_API_KEY` | 通义千问 API Key，必填 |
+| `FASTAPI_API_KEY` | FastAPI 业务接口鉴权密钥 |
+| `REDIS_HOST` | Redis 地址 |
+| `REDIS_PORT` | Redis 端口 |
+| `REDIS_DB` | Redis DB |
+
+关键依赖：
+
+| 依赖 | 用途 |
+| --- | --- |
+| `langchain`, `langgraph` | Agent 和工作流 |
+| `langchain-chroma`, `chromadb` | 向量库 |
+| `streamlit` | Web 演示和管理页 |
+| `fastapi`, `uvicorn` | API 后端 |
+| `sse-starlette` | SSE 流式响应 |
+| `python-multipart` | 文件上传 |
+| `dashscope` | 通义千问模型 |
+| `redis` | 缓存 |
+| `rank_bm25`, `jieba`, `numpy` | RAG 检索和排序 |
+
+---
+
+## 7. 启动方式
+
+项目默认 Conda 环境：
+
 ```bash
-streamlit run app.py --server.runOnSave=true
+conda activate wisdomsystem-py311
+```
+
+Streamlit：
+
+```bash
+conda activate wisdomsystem-py311
+streamlit run app.py --server.port 8501
+```
+
+FastAPI：
+
+```bash
+conda activate wisdomsystem-py311
+uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+RAG 评估：
+
+```bash
+python tests/rag_evaluation.py
+```
+
+语法检查：
+
+```bash
+python -m compileall agent memory rag database utils model api services app.py tests
 ```
 
 ---
 
-## 7. 扩展指南
+## 8. 扩展规则
 
-### 7.1 添加新工具
+### 新增 Agent 工具
 
-**步骤一：实现工具函数**
-- 在 agent/tools/agent_tools.py 中创建新函数
-- 使用 @tool 装饰器标记
-- 编写清晰的函数文档字符串
-- 实现工具逻辑并返回结果
+1. 在 `agent/tools/agent_tools.py` 实现函数。
+2. 使用 `@tool` 注册。
+3. 在 `ReactAgent` 初始化时加入工具列表。
+4. 保持返回值为字符串或 JSON 字符串。
 
-**步骤二：注册工具**
-- 在 ReactAgent 的初始化代码中导入新工具
-- 将工具添加到 create_react_agent 的 tools 参数列表中
+### 新增 API
 
-**步骤三：测试验证**
-- 启动应用并测试新工具
-- 验证参数传递正确
-- 检查返回值符合预期
+1. 在 `api/schemas.py` 定义模型。
+2. 在 `services/` 实现业务逻辑。
+3. 在 `api/routes/` 新增路由。
+4. 在 `api/main.py` 注册路由和服务。
+5. 复用 `verify_api_key` 做鉴权。
 
-### 7.2 添加新中间件
+### 扩展知识库
 
-**步骤一：选择执行时机**
-- 模型调用前：在模型推理前执行日志或预处理
-- 提示词生成前：动态切换提示词
-- 工具调用时：监控工具执行过程
-
-**步骤二：实现中间件逻辑**
-- 在 agent/tools/middleware.py 中创建闭包函数
-- 使用 create_xxx() 工厂函数返回内部函数
-- 编写执行逻辑并返回适当的值
-
-**步骤三：注册中间件**
-- 在 agent/react_agent.py 的 _setup_middleware() 方法中添加注册
-- 确保中间件函数被正确导入
-- 检查 LangGraph 版本兼容性
-
-### 7.3 扩展提示词
-
-**步骤一：创建提示词文件**
-- 在 prompts/ 目录下创建新文件
-- 使用清晰的命名规范
-- 编写完整的提示词内容
-
-**步骤二：添加加载函数**
-- 在 utils/prompt_loader.py 中添加加载函数
-- 确保文件路径正确
-- 处理文件不存在的情况
-
-**步骤三：实现切换逻辑**
-- 在中间件中添加场景判断
-- 根据条件选择合适的提示词
-- 测试不同场景的提示词切换
+1. 新文件类型先更新 `config/chroma.yml`。
+2. 在 `VectorStoreService._get_file_documents()` 增加 loader。
+3. 在 `KnowledgeService` 封装业务逻辑。
+4. 破坏性操作必须在 UI 中提供确认。
 
 ---
 
-## 8. 维护建议
+## 9. 维护重点
 
-### 8.1 日志监控
+优先关注：
 
-建议重点关注以下日志指标：
-- 工具调用成功率
-- 模型调用响应时间
-- 记忆上下文命中率
-- 异常发生频率
-
-### 8.2 性能优化
-
-**缓存优化策略：**
-- 常用数据缓存到 Redis
-- 避免重复查询数据库
-- 减少重复计算
-
-**预热机制：**
-- 启动时预加载向量数据库
-- 提前初始化模型实例
-- 建立连接池
-
-**异步处理：**
-- 考虑工具调用异步化
-- 使用异步 I/O 提高效率
-- 减少阻塞操作
-
-### 8.3 安全考虑
-
-**输入验证：**
-- 对所有用户输入进行校验
-- 防止注入攻击
-- 限制输入长度和格式
-
-**密钥管理：**
-- API 密钥存放在环境变量
-- 避免硬编码敏感信息
-- 定期轮换密钥
-
-**权限控制：**
-- 考虑添加用户身份验证
-- 实现访问控制列表
-- 记录操作审计日志
+- API Key 和模型 Key 不得硬编码。
+- `.env`、日志、数据库、向量库和上传文件不得提交。
+- RAG 修改后运行评估脚本。
+- FastAPI 路由层只做参数和响应处理，业务逻辑放服务层。
+- 知识库删除当前只删除 chunk，不删除原始文件。
+- 重建索引会清空当前向量库，执行前需明确提示。
 
 ---
 
-## 9. 版本历史
+## 10. 版本记录
 
-| 版本 | 日期 | 变更内容 |
-|-----|------|---------|
-| v1.0 | 初始版本 | 基础Agent框架，包含核心对话功能和工具系统 |
-| v1.1 | 2026-06-19 | 单例模式优化，提升响应速度；修复系统消息冲突问题；改进性能表现 |
-| v1.2 | 2026-06-19 | 安全修复（移除硬编码Key、eval改JSON）；Agent稳定性（流式输出修复、中间件接入、工具返回值修正）；CSV解析改进；依赖补齐 |
+| 版本 | 日期 | 说明 |
+| --- | --- | --- |
+| v1.0 | 初始版本 | 基础 Agent、对话和工具系统 |
+| v1.1 | 2026-06-19 | 单例优化、系统消息冲突修复、性能优化 |
+| v1.2 | 2026-06-19 | 安全修复、流式输出修复、CSV 解析、依赖补齐 |
+| v1.3 | 2026-06-20 | FastAPI 服务层和知识库管理模块 |
 
----
-
-**文档生成日期：** 2026-06-19
-
-**适用版本：** v1.2
-
-**维护负责人：** 项目开发团队
+**适用版本：** v1.3  
+**最后更新：** 2026-06-20

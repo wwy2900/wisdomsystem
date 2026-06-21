@@ -40,3 +40,9 @@ redis==5.0.1
 
 # 中文分词
 jieba==0.42.1
+
+# FastAPI 后端
+fastapi
+uvicorn[standard]
+sse-starlette
+python-multipart

@@ -2,6 +2,7 @@ from functools import lru_cache
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_community.chat_models.tongyi import ChatTongyi
+from utils.logger_handler import logger
 import re
 
 
@@ -50,23 +51,35 @@ class QueryRewriter:
         return rewrites
 
     def rewrite_multi_with_filter(self, query: str, num_rewrites: int = 3, threshold: float = 0.8):
-        """多路改写并过滤，只返回相似度≥threshold的改写结果"""
+        """多路改写并过滤，只返回相似度≥threshold的改写结果。
+        相似度检查失败时降级为不过滤，保证可用性。"""
         from rag.semantic_checker import SemanticChecker
-        
+
         checker = SemanticChecker()
         valid_rewrites = []
-        
+
         output = self.chain.invoke({"query": query})
         rewrites = self._parse_rewrites(output)
-        
+
         for rewrite in rewrites:
-            similarity = checker.calculate_similarity(query, rewrite["text"])
-            
-            if similarity >= threshold:
+            try:
+                similarity = checker.calculate_similarity(query, rewrite["text"])
+
+                if similarity >= threshold:
+                    valid_rewrites.append({
+                        "text": rewrite["text"],
+                        "similarity": similarity,
+                        "type": rewrite["type"]
+                    })
+            except Exception as e:
+                # 相似度检查失败时降级：直接保留该改写（不过滤）
+                logger.warning(
+                    f"[QueryRewriter]相似度检查失败，降级为不过滤: {str(e)}"
+                )
                 valid_rewrites.append({
                     "text": rewrite["text"],
-                    "similarity": similarity,
+                    "similarity": 0.0,
                     "type": rewrite["type"]
                 })
-        
+
         return valid_rewrites

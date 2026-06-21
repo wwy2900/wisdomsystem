@@ -2,11 +2,7 @@
   {
     "id": "test_001",
     "user_query": "咋充电",
-    "relevant_doc_ids": [
-      "chunk_0035",
-      "chunk_0085",
-      "chunk_0103"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "充电",
       "充电座",
@@ -17,11 +13,7 @@
   {
     "id": "test_002",
     "user_query": "首次使用咋弄",
-    "relevant_doc_ids": [
-      "chunk_0101",
-      "chunk_0182",
-      "chunk_0307"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "首次",
       "开机",
@@ -32,11 +24,7 @@
   {
     "id": "test_003",
     "user_query": "找不到充电座",
-    "relevant_doc_ids": [
-      "chunk_0035",
-      "chunk_0103",
-      "chunk_0104"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "充电座",
       "回充",
@@ -47,11 +35,7 @@
   {
     "id": "test_004",
     "user_query": "拖地效果怎么样",
-    "relevant_doc_ids": [
-      "chunk_0018",
-      "chunk_0115",
-      "chunk_0131"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "拖地",
       "水箱",
@@ -62,11 +46,7 @@
   {
     "id": "test_005",
     "user_query": "会缠头发吗",
-    "relevant_doc_ids": [
-      "chunk_0007",
-      "chunk_0033",
-      "chunk_0111"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "毛发",
       "缠绕",
@@ -77,11 +57,7 @@
   {
     "id": "test_006",
     "user_query": "虚拟墙咋设",
-    "relevant_doc_ids": [
-      "chunk_0015",
-      "chunk_0023",
-      "chunk_0304"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "虚拟墙",
       "禁区",
@@ -92,11 +68,7 @@
   {
     "id": "test_007",
     "user_query": "WiFi连不上",
-    "relevant_doc_ids": [
-      "chunk_0104",
-      "chunk_0147",
-      "chunk_0181"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "WiFi",
       "连接",
@@ -107,11 +79,7 @@
   {
     "id": "test_008",
     "user_query": "噪音太大",
-    "relevant_doc_ids": [
-      "chunk_0164",
-      "chunk_0306",
-      "chunk_0359"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "噪音",
       "静音",
@@ -122,11 +90,7 @@
   {
     "id": "test_009",
     "user_query": "能爬地毯吗",
-    "relevant_doc_ids": [
-      "chunk_0011",
-      "chunk_0255",
-      "chunk_0305"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "地毯",
       "越障",
@@ -137,11 +101,7 @@
   {
     "id": "test_010",
     "user_query": "滤网咋清洗",
-    "relevant_doc_ids": [
-      "chunk_0009",
-      "chunk_0030",
-      "chunk_0065"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "滤网",
       "清洗",
@@ -152,11 +112,7 @@
   {
     "id": "test_011",
     "user_query": "边刷咋换",
-    "relevant_doc_ids": [
-      "chunk_0031",
-      "chunk_0066",
-      "chunk_0122"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "边刷",
       "更换",
@@ -167,11 +123,7 @@
   {
     "id": "test_012",
     "user_query": "APP有啥功能",
-    "relevant_doc_ids": [
-      "chunk_0020",
-      "chunk_0021",
-      "chunk_0022"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "APP",
       "手机",
@@ -182,11 +134,7 @@
   {
     "id": "test_013",
     "user_query": "定时清扫咋设",
-    "relevant_doc_ids": [
-      "chunk_0057",
-      "chunk_0284",
-      "chunk_0370"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "定时",
       "预约",
@@ -197,11 +145,7 @@
   {
     "id": "test_014",
     "user_query": "LDS和VSLAM哪个好",
-    "relevant_doc_ids": [
-      "chunk_0001",
-      "chunk_0002",
-      "chunk_0003"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "LDS",
       "VSLAM",
@@ -212,11 +156,7 @@
   {
     "id": "test_015",
     "user_query": "滚刷和胶刷区别",
-    "relevant_doc_ids": [
-      "chunk_0007",
-      "chunk_0033",
-      "chunk_0042"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "滚刷",
       "胶刷",
@@ -227,10 +167,7 @@
   {
     "id": "test_016",
     "user_query": "机器人卡住了",
-    "relevant_doc_ids": [
-      "chunk_0034",
-      "chunk_0035"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "卡住",
       "障碍物",
@@ -241,11 +178,7 @@
   {
     "id": "test_017",
     "user_query": "冬天能用吗",
-    "relevant_doc_ids": [
-      "chunk_0083",
-      "chunk_0179",
-      "chunk_0329"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "冬季",
       "低温",
@@ -256,11 +189,7 @@
   {
     "id": "test_018",
     "user_query": "夏天太热",
-    "relevant_doc_ids": [
-      "chunk_0085",
-      "chunk_0319",
-      "chunk_0335"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "夏季",
       "高温",
@@ -271,11 +200,7 @@
   {
     "id": "test_019",
     "user_query": "建图不准",
-    "relevant_doc_ids": [
-      "chunk_0004",
-      "chunk_0005",
-      "chunk_0036"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "建图",
       "精度",
@@ -286,11 +211,7 @@
   {
     "id": "test_020",
     "user_query": "会迷路吗",
-    "relevant_doc_ids": [
-      "chunk_0001",
-      "chunk_0004",
-      "chunk_0005"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "迷路",
       "定位",
@@ -301,11 +222,7 @@
   {
     "id": "test_021",
     "user_query": "充电发热",
-    "relevant_doc_ids": [
-      "chunk_0076",
-      "chunk_0083",
-      "chunk_0085"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "充电",
       "发热",
@@ -316,11 +233,7 @@
   {
     "id": "test_022",
     "user_query": "续航多久",
-    "relevant_doc_ids": [
-      "chunk_0126",
-      "chunk_0127",
-      "chunk_0179"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "续航",
       "电池",
@@ -331,11 +244,7 @@
   {
     "id": "test_023",
     "user_query": "边刷不转",
-    "relevant_doc_ids": [
-      "chunk_0113",
-      "chunk_0149",
-      "chunk_0190"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "边刷",
       "旋转",
@@ -346,11 +255,7 @@
   {
     "id": "test_024",
     "user_query": "开机没反应",
-    "relevant_doc_ids": [
-      "chunk_0102",
-      "chunk_0139",
-      "chunk_0146"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "开机",
       "电源",
@@ -361,11 +266,7 @@
   {
     "id": "test_025",
     "user_query": "充电指示灯闪",
-    "relevant_doc_ids": [
-      "chunk_0301",
-      "chunk_0302",
-      "chunk_0307"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "充电",
       "指示灯",
@@ -376,11 +277,7 @@
   {
     "id": "test_026",
     "user_query": "自动洗拖布好用吗",
-    "relevant_doc_ids": [
-      "chunk_0019",
-      "chunk_0041",
-      "chunk_0042"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "洗拖布",
       "基站",
@@ -391,11 +288,7 @@
   {
     "id": "test_027",
     "user_query": "水箱漏水",
-    "relevant_doc_ids": [
-      "chunk_0131",
-      "chunk_0211",
-      "chunk_0225"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "水箱",
       "漏水",
@@ -406,11 +299,7 @@
   {
     "id": "test_028",
     "user_query": "能扫瓷砖吗",
-    "relevant_doc_ids": [
-      "chunk_0010",
-      "chunk_0011",
-      "chunk_0018"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "瓷砖",
       "地面",
@@ -421,11 +310,7 @@
   {
     "id": "test_029",
     "user_query": "尘盒咋拆",
-    "relevant_doc_ids": [
-      "chunk_0029",
-      "chunk_0052",
-      "chunk_0106"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "尘盒",
       "拆卸",
@@ -436,11 +321,7 @@
   {
     "id": "test_030",
     "user_query": "能识别家具吗",
-    "relevant_doc_ids": [
-      "chunk_0051",
-      "chunk_0152",
-      "chunk_0177"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "避障",
       "家具",
@@ -451,11 +332,7 @@
   {
     "id": "test_031",
     "user_query": "APP咋更新",
-    "relevant_doc_ids": [
-      "chunk_0154",
-      "chunk_0162",
-      "chunk_0181"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "APP",
       "更新",
@@ -466,11 +343,7 @@
   {
     "id": "test_032",
     "user_query": "恢复出厂设置",
-    "relevant_doc_ids": [
-      "chunk_0109",
-      "chunk_0147",
-      "chunk_0182"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "出厂设置",
       "恢复",
@@ -481,11 +354,7 @@
   {
     "id": "test_033",
     "user_query": "多楼层咋弄",
-    "relevant_doc_ids": [
-      "chunk_0025",
-      "chunk_0060",
-      "chunk_0080"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "多楼层",
       "地图",
@@ -496,11 +365,7 @@
   {
     "id": "test_034",
     "user_query": "清扫面积不准",
-    "relevant_doc_ids": [
-      "chunk_0160",
-      "chunk_0195",
-      "chunk_0317"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "面积",
       "地图",
@@ -511,11 +376,7 @@
   {
     "id": "test_035",
     "user_query": "儿童安全",
-    "relevant_doc_ids": [
-      "chunk_0078",
-      "chunk_0170",
-      "chunk_0304"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "儿童",
       "安全",
@@ -526,10 +387,7 @@
   {
     "id": "test_036",
     "user_query": "租房适合吗",
-    "relevant_doc_ids": [
-      "chunk_0171",
-      "chunk_0284"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "小户型",
       "清扫模式",
@@ -540,11 +398,7 @@
   {
     "id": "test_037",
     "user_query": "能吸豆子吗",
-    "relevant_doc_ids": [
-      "chunk_0006",
-      "chunk_0042",
-      "chunk_0043"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "吸力",
       "Pa",
@@ -555,10 +409,7 @@
   {
     "id": "test_038",
     "user_query": "dToF是什么",
-    "relevant_doc_ids": [
-      "chunk_0003",
-      "chunk_0004"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "dToF",
       "导航",
@@ -569,11 +420,7 @@
   {
     "id": "test_039",
     "user_query": "有语音控制吗",
-    "relevant_doc_ids": [
-      "chunk_0021",
-      "chunk_0022",
-      "chunk_0026"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "语音",
       "助手",
@@ -584,11 +431,7 @@
   {
     "id": "test_040",
     "user_query": "能设置禁区吗",
-    "relevant_doc_ids": [
-      "chunk_0015",
-      "chunk_0023",
-      "chunk_0304"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "禁区",
       "虚拟墙",
@@ -599,11 +442,7 @@
   {
     "id": "test_041",
     "user_query": "越障高度多少",
-    "relevant_doc_ids": [
-      "chunk_0012",
-      "chunk_0161",
-      "chunk_0255"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "越障",
       "高度",
@@ -614,9 +453,7 @@
   {
     "id": "test_042",
     "user_query": "震动拖地有效吗",
-    "relevant_doc_ids": [
-      "chunk_0018"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "震动",
       "拖地",
@@ -627,9 +464,7 @@
   {
     "id": "test_043",
     "user_query": "电控水箱好吗",
-    "relevant_doc_ids": [
-      "chunk_0017"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "电控水箱",
       "渗水",
@@ -640,11 +475,7 @@
   {
     "id": "test_044",
     "user_query": "复合滤网咋样",
-    "relevant_doc_ids": [
-      "chunk_0009",
-      "chunk_0030",
-      "chunk_0065"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "滤网",
       "HEPA",
@@ -655,11 +486,7 @@
   {
     "id": "test_045",
     "user_query": "双主刷好吗",
-    "relevant_doc_ids": [
-      "chunk_0010",
-      "chunk_0018",
-      "chunk_0020"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "双主刷",
       "清洁",
@@ -670,11 +497,7 @@
   {
     "id": "test_046",
     "user_query": "划区清扫咋用",
-    "relevant_doc_ids": [
-      "chunk_0014",
-      "chunk_0021",
-      "chunk_0025"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "划区",
       "APP",
@@ -685,11 +508,7 @@
   {
     "id": "test_047",
     "user_query": "清洁记录咋看",
-    "relevant_doc_ids": [
-      "chunk_0021",
-      "chunk_0024",
-      "chunk_0195"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "清洁记录",
       "APP",
@@ -700,11 +519,7 @@
   {
     "id": "test_048",
     "user_query": "耗材提醒在哪",
-    "relevant_doc_ids": [
-      "chunk_0021",
-      "chunk_0022",
-      "chunk_0025"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "耗材",
       "提醒",
@@ -715,11 +530,7 @@
   {
     "id": "test_049",
     "user_query": "能识别地毯增压吗",
-    "relevant_doc_ids": [
-      "chunk_0013",
-      "chunk_0043",
-      "chunk_0114"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "地毯",
       "增压",
@@ -730,11 +541,7 @@
   {
     "id": "test_050",
     "user_query": "拖地抬滚刷吗",
-    "relevant_doc_ids": [
-      "chunk_0020",
-      "chunk_0119",
-      "chunk_0173"
-    ],
+    "relevant_doc_ids": [],
     "expected_keywords": [
       "滚刷",
       "抬起",

@@ -3,6 +3,9 @@ from langchain_core.documents import Document
 from utils.config_handler import chroma_conf
 from utils.path_tool import get_abs_path
 from utils.file_handler import pdf_loader, txt_loader, listdir_with_allowed_type
+from functools import lru_cache
+import jieba
+
 
 class BM25Retriever:
     def __init__(self):
@@ -30,14 +33,19 @@ class BM25Retriever:
                 self.corpus.append(doc.page_content)
 
         if self.corpus:
-            tokenized_corpus = [doc.split() for doc in self.corpus]
+            tokenized_corpus = [list(self._tokenize(doc)) for doc in self.corpus]
             self.bm25 = BM25Okapi(tokenized_corpus)
+
+    @lru_cache(maxsize=1000)
+    def _tokenize(self, text: str) -> tuple:
+        """jieba 中文分词，返回 tuple 以便缓存"""
+        return tuple(jieba.lcut(text))
 
     def retrieve(self, query: str, k: int = 10) -> list:
         if not self.bm25:
             return []
 
-        tokenized_query = query.split()
+        tokenized_query = list(self._tokenize(query))
         scores = self.bm25.get_scores(tokenized_query)
         top_n_indices = scores.argsort()[-k:][::-1]
 

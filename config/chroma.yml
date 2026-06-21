@@ -9,3 +9,6 @@ chunk_size : 200
 chunk_overlap : 20
 separators : ["\n\n","。",".","?","？","!"," ",""]
 
+# 上下文增强（每个 chunk 调 LLM 生成摘要，加载慢，默认关闭）
+contextual_enhancer : false
+

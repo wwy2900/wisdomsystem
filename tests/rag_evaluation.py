@@ -4,6 +4,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from typing import List, Dict, Any
 from rag.rag_service import RagSummarizeService
 from rag.vector_store import VectorStoreService
@@ -239,26 +242,43 @@ class RAGEvaluator:
 
 
 if __name__ == "__main__":
-    import os
-    
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
     api_key = os.environ.get("DASHSCOPE_API_KEY")
     if not api_key:
-        print("❌ 错误：未配置 DASHSCOPE_API_KEY 环境变量")
-        print("请设置环境变量后再运行：")
-        print("  Linux/Mac: export DASHSCOPE_API_KEY=your_api_key")
-        print("  Windows: set DASHSCOPE_API_KEY=your_api_key")
-        print("或在 .env 文件中配置 DASHSCOPE_API_KEY")
+        print("[ERROR] 未配置 DASHSCOPE_API_KEY 环境变量")
+        print("请在 .env 文件中配置 DASHSCOPE_API_KEY")
         exit(1)
 
     evaluator = RAGEvaluator()
 
     test_cases = evaluator.load_test_cases()
-    test_cases = test_cases[:5]
 
-    print("\n[1/2] 评估召回率 (Recall@K)...")
+    print("\n[1/2] 评估召回率 (Recall@K) - 全部 50 个测试用例...")
     recall_results = evaluator.evaluate_recall_at_k(test_cases, k=5)
+    print(f"Recall@1: {recall_results['recall_at_1']:.1%}")
+    print(f"Recall@3: {recall_results['recall_at_3']:.1%}")
     print(f"Recall@5: {recall_results['recall_at_5']:.1%}")
+    print(f"MRR:      {recall_results['mrr']:.3f}")
 
-    print("\n[2/2] 评估忠诚度 (Fidelity)...")
-    fidelity_results = evaluator.evaluate_fidelity(test_cases)
+    # 显示失败案例
+    failed_cases = [r for r in recall_results['detailed_results'] if not r['hit_at_5']]
+    if failed_cases:
+        print(f"\n召回失败案例 ({len(failed_cases)} 个):")
+        for case in failed_cases[:10]:
+            print(f"  - {case['user_query']}")
+            print(f"    预期: {case['expected_doc_ids']}")
+            print(f"    实际: {case['retrieved_doc_ids']}")
+
+    print("\n[2/2] 评估忠诚度 (Fidelity) - 前 10 个测试用例...")
+    fidelity_results = evaluator.evaluate_fidelity(test_cases[:10])
     print(f"Fidelity: {fidelity_results['fidelity_rate']:.1%}")
+
+    # 保存完整结果
+    evaluator.save_results({
+        "recall": recall_results,
+        "fidelity": fidelity_results,
+        "test_cases": test_cases,
+    })

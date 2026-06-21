@@ -1,10 +1,21 @@
 import re
 from langchain_core.documents import Document
 from rag.contextual_enhancer import ContextualEnhancer
+from utils.config_handler import chroma_conf
+from utils.logger_handler import logger
 
 
 class QuestionBasedSplitter:
     """按问题切分文档，保证语义连贯性"""
+
+    def __init__(self):
+        # 根据配置决定是否启用上下文增强（默认关闭，因为每个 chunk 调 LLM 加载慢）
+        self.use_enhancer = chroma_conf.get("contextual_enhancer", False)
+        self.enhancer = ContextualEnhancer() if self.use_enhancer else None
+        if self.use_enhancer:
+            logger.info("[QuestionBasedSplitter]上下文增强已启用")
+        else:
+            logger.info("[QuestionBasedSplitter]上下文增强已关闭")
 
     def split_text(self, text: str) -> list[str]:
         """按问题切分文本"""
@@ -101,14 +112,17 @@ class QuestionBasedSplitter:
         """切分文档列表"""
         results = []
         chunk_id = 1
-        enhancer = ContextualEnhancer()
 
         for doc in documents:
             chunks = self.split_text(doc.page_content)
             document_title = doc.metadata.get("source", "").split("\\")[-1].replace(".txt", "")
             
             for chunk_text in chunks:
-                enhanced_content = enhancer.enhance(document_title, chunk_text)
+                # 根据配置决定是否启用上下文增强
+                if self.enhancer:
+                    enhanced_content = self.enhancer.enhance(document_title, chunk_text)
+                else:
+                    enhanced_content = chunk_text
                 
                 results.append(Document(
                     page_content=enhanced_content,

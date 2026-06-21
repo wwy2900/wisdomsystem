@@ -108,3 +108,12 @@ class RedisCache:
 
     def get_user_sessions(self, user_id: str) -> List[str]:
         return self.client.lrange(f"user:{user_id}:sessions", 0, -1) or []
+
+    def set_cache(self, key: str, value: str, ttl_seconds: int = 86400):
+        """设置通用缓存（供 RAG 等模块使用）"""
+        self.client.set(key, value)
+        self.client.expire(key, timedelta(seconds=ttl_seconds))
+
+    def get_cache(self, key: str) -> Optional[str]:
+        """获取通用缓存"""
+        return self.client.get(key)

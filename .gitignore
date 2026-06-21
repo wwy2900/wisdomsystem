@@ -35,6 +35,7 @@ chroma_db/
 # Session data
 data/sessions/
 data/memory.db
+data/knowledge_uploads/
 
 # OS
 .DS_Store

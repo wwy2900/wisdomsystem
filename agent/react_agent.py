@@ -1,5 +1,5 @@
 from langgraph.prebuilt import create_react_agent
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 from model.factory import chat_model
 from utils.prompt_loader import load_system_prompts
 from agent.tools.agent_tools import (rag_summarize, get_weather, get_user_location, get_user_id,
@@ -78,14 +78,26 @@ class ReactAgent:
                             has_tool_calls = bool(getattr(msg, 'tool_calls', None))
 
                             if has_tool_calls:
-                                # 工具调用前的思考，直接输出
-                                yield content
+                                # 工具调用前的思考，添加标记
+                                yield f"\n🔧 [调用工具]\n{content}\n"
                                 yielded_content.add(content)
+                                # 输出工具调用详情
+                                for tc in msg.tool_calls:
+                                    tool_name = tc.get('name', 'unknown')
+                                    tool_args = tc.get('args', {})
+                                    args_str = ", ".join([f"{k}={v}" for k, v in tool_args.items()])
+                                    yield f"🔧 {tool_name}({args_str})\n"
                             else:
                                 # 最终回答，直接输出并记录
                                 yield content
                                 final_answer = content
                                 yielded_content.add(content)
+                        elif isinstance(msg, ToolMessage):
+                            # 工具返回结果，添加标记
+                            tool_name = getattr(msg, 'name', 'unknown')
+                            tool_content = getattr(msg, 'content', '')
+                            preview = tool_content[:150] + "..." if len(tool_content) > 150 else tool_content
+                            yield f"\n✅ [工具返回: {tool_name}] {preview}\n"
 
         if final_answer:
             self.memory_manager.add_message(session_id, "assistant", final_answer)

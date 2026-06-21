@@ -63,6 +63,15 @@
 | `fetch_external_data` | 获取用户使用记录数据 |
 | `fill_context_for_report` | 触发报告生成上下文注入 |
 
+### 📚 知识库管理
+
+- ✅ FastAPI 管理接口：上传文档、查看 chunk、检索预览、删除 chunk、重建索引
+- ✅ Streamlit 管理页面：侧边栏切换到“知识库管理”即可使用
+- ✅ 支持 `.txt` 和 `.pdf` 文档
+- ✅ 上传文件保存到 `data/knowledge_uploads/`
+- ✅ 使用 MD5 去重，避免重复写入向量库
+- ✅ 删除策略为删除向量库 chunk，不删除原始文件
+
 ### 🛡️ 安全特性
 
 - ✅ SQL 注入防护：使用 JSON 解析替代 `eval`
@@ -98,6 +107,7 @@ python tests/rag_evaluation.py
 | **工作流** | LangGraph | 0.2.50 |
 | **向量数据库** | ChromaDB | 0.5.15 |
 | **前端** | Streamlit | 1.40.1 |
+| **API 后端** | FastAPI / Uvicorn | - |
 | **LLM** | 通义千问 (DashScope) | - |
 | **缓存** | Redis / SimpleCache | 5.0.1 |
 | **数据库** | SQLite | - |
@@ -132,6 +142,12 @@ WisdomSystem/
 ├── database/               # 数据库模块
 │   ├── sqlite_db.py        # SQLite 数据存储（单例模式，JSON解析）
 │   └── redis_cache.py      # Redis 缓存（单例模式，支持降级）
+├── api/                    # FastAPI 后端接口
+│   ├── main.py             # FastAPI 应用入口
+│   └── routes/             # 聊天和知识库管理路由
+├── services/               # 服务层
+│   ├── chat_service.py     # 聊天服务
+│   └── knowledge_service.py # 知识库管理服务
 ├── model/                  # 模型工厂
 │   └── factory.py          # 通义千问模型初始化
 ├── config/                 # 配置文件
@@ -144,6 +160,7 @@ WisdomSystem/
 │   ├── rag_summarize.txt   # RAG 总结提示词
 │   └── report_prompt.txt   # 报告生成提示词
 ├── data/                   # 知识库文档
+│   ├── knowledge_uploads/  # 管理页面/API 上传的知识库文档
 │   ├── external/           # 外部数据
 │   │   └── records.csv     # 用户使用记录（CSV格式）
 │   ├── 扫地机器人100问.pdf
@@ -249,6 +266,18 @@ streamlit run app.py --server.port 8501
 
 访问 **http://localhost:8501** 即可使用。
 
+**FastAPI 后端启动：**
+
+```bash
+uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+访问接口文档：
+
+```text
+http://localhost:8000/docs
+```
+
 ### 7. 首次运行说明
 
 首次运行时，系统会自动执行以下操作：
@@ -283,6 +312,33 @@ python tests/rag_evaluation.py
 - 故障排除指南
 - 维护保养建议
 - 选购指南
+
+### 知识库管理接口
+
+FastAPI 提供以下管理接口，默认复用 `X-API-Key` 鉴权：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/knowledge/documents/upload` | 上传 `.txt` / `.pdf` 并立即入库 |
+| GET | `/api/v1/knowledge/chunks` | 分页查看向量库 chunk |
+| GET | `/api/v1/knowledge/search` | 检索知识库命中内容 |
+| DELETE | `/api/v1/knowledge/chunks/{doc_id}` | 删除指定 chunk，不删除原始文件 |
+| POST | `/api/v1/knowledge/rebuild` | 清空并重建知识库索引 |
+
+上传示例：
+
+```bash
+curl -X POST http://localhost:8000/api/v1/knowledge/documents/upload \
+  -H "X-API-Key: your_api_key_here" \
+  -F "file=@./data/维护保养.txt"
+```
+
+检索示例：
+
+```bash
+curl "http://localhost:8000/api/v1/knowledge/search?query=不回充&k=5" \
+  -H "X-API-Key: your_api_key_here"
+```
 
 ---
 
