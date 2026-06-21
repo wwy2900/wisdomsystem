@@ -104,16 +104,21 @@ class RagSummarizeService:
         self._local_cache[key] = value
 
     # ===== 并行检索 =====
-    def _hybrid_retrieval_single(self, query: str) -> list[Document]:
+    def _hybrid_retrieval_single(self, query: str, user_id: str | None = None) -> list[Document]:
         """单个 Query 的混合召回：并行执行向量检索和 BM25 检索"""
         with ThreadPoolExecutor(max_workers=2) as executor:
-            vector_future = executor.submit(self._get_vector_retriever().invoke, query)
+            vector_future = executor.submit(
+                self._get_vector_store().retrieve_documents,
+                query,
+                10,
+                user_id,
+            )
             bm25_future = executor.submit(self._get_bm25_retriever().retrieve, query)
             vector_docs = vector_future.result()
             bm25_docs = bm25_future.result()
         return rrf_fusion(vector_docs, bm25_docs)
 
-    def _hybrid_retrieval_multi(self, queries: list) -> list[Document]:
+    def _hybrid_retrieval_multi(self, queries: list, user_id: str | None = None) -> list[Document]:
         """多路 Query 召回：并行执行所有 Query 的混合召回，然后融合所有结果"""
         all_docs = []
 
@@ -122,7 +127,7 @@ class RagSummarizeService:
 
         with ThreadPoolExecutor(max_workers=min(len(queries), 4)) as executor:
             futures = {
-                executor.submit(self._hybrid_retrieval_single, q["text"]): q
+                executor.submit(self._hybrid_retrieval_single, q["text"], user_id): q
                 for q in queries
             }
             for future in as_completed(futures):
@@ -137,7 +142,7 @@ class RagSummarizeService:
 
         return rrf_fusion(all_docs, [], k=60, top_n=20)
 
-    def retriever_docs(self, query: str) -> list[Document]:
+    def retriever_docs(self, query: str, user_id: str | None = None) -> list[Document]:
         """完整的检索流程：多路改写 → 多路召回 → Rerank 精排"""
         # 1. 多路改写并过滤（相似度≥0.8）
         valid_rewrites = self._get_query_rewriter().rewrite_multi_with_filter(
@@ -151,16 +156,19 @@ class RagSummarizeService:
         queries_to_retrieve.extend(valid_rewrites)
 
         # 3. 多路并行召回
-        fused_docs = self._hybrid_retrieval_multi(queries_to_retrieve)
+        fused_docs = self._hybrid_retrieval_multi(queries_to_retrieve, user_id=user_id)
 
         # 4. Rerank 精排（使用原 Query 进行精排）
         reranked_docs = self._get_reranker().rerank(query, fused_docs)
 
         return reranked_docs
 
-    def rag_summarize(self, query: str) -> str:
+    def rag_summarize(self, query: str, user_id: str | None = None) -> str:
         """带两级缓存的 RAG 总结"""
-        cache_key = f"rag:{hashlib.md5(query.encode()).hexdigest()}"
+        scope = user_id or "__shared__"
+        query_hash = hashlib.md5(query.encode()).hexdigest()
+        scope_hash = hashlib.md5(scope.encode()).hexdigest()
+        cache_key = f"rag:{scope_hash}:{query_hash}"
 
         # 1. 本地内存缓存
         local_result = self._local_cache_get(cache_key)
@@ -179,7 +187,7 @@ class RagSummarizeService:
             logger.warning(f"[RAG]Redis 缓存读取失败: {str(e)}")
 
         # 3. 检索 + 生成
-        context_docs = self.retriever_docs(query)
+        context_docs = self.retriever_docs(query, user_id=user_id)
 
         context = ""
         counter = 0

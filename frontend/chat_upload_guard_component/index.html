@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>chat_upload_guard</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    (() => {
+      const COMPONENT_READY = "streamlit:componentReady";
+      const SET_FRAME_HEIGHT = "streamlit:setFrameHeight";
+      const RENDER = "streamlit:render";
+      const API_VERSION = 1;
+      const OPEN_ATTR = "data-chat-upload-panel-open";
+
+      function postMessage(type, payload = {}) {
+        window.parent.postMessage(
+          {
+            isStreamlitMessage: true,
+            type,
+            ...payload,
+          },
+          "*"
+        );
+      }
+
+      function setFrameHeight(height = 0) {
+        postMessage(SET_FRAME_HEIGHT, { height });
+      }
+
+      function setComponentReady() {
+        postMessage(COMPONENT_READY, { apiVersion: API_VERSION });
+      }
+
+      function getParentBody() {
+        try {
+          return window.parent.document.body;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function isParentElement(target) {
+        try {
+          return target instanceof window.parent.Element;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function setPanelOpen(isOpen) {
+        const body = getParentBody();
+        if (!body) {
+          return;
+        }
+        body.setAttribute(OPEN_ATTR, isOpen ? "true" : "false");
+      }
+
+      function isPanelOpen() {
+        const body = getParentBody();
+        return body ? body.getAttribute(OPEN_ATTR) === "true" : false;
+      }
+
+      function matchesClosest(target, selectors) {
+        return selectors.some((selector) => target.closest(selector));
+      }
+
+      function shouldIgnoreTarget(target) {
+        return matchesClosest(target, [
+          '[data-testid="stSidebar"]',
+          '[data-testid="stSidebarCollapsedControl"]',
+          ".st-key-chat-upload-bar",
+        ]);
+      }
+
+      function isToggleTarget(target) {
+        return Boolean(target.closest(".st-key-chat-upload-toggle"));
+      }
+
+      function classifyTarget(target) {
+        if (target.closest('[data-testid="stChatInput"]')) {
+          return "chat_input";
+        }
+        if (target.closest('[data-testid="stAppViewContainer"]')) {
+          return "outside_main";
+        }
+        return "";
+      }
+
+      function focusChatInput() {
+        try {
+          const input = window.parent.document.querySelector('[data-testid="stChatInputTextArea"]');
+          if (!input) {
+            return false;
+          }
+          input.focus();
+          const value = typeof input.value === "string" ? input.value : "";
+          if (typeof input.setSelectionRange === "function") {
+            input.setSelectionRange(value.length, value.length);
+          }
+          return window.parent.document.activeElement === input;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function closePanel(reason = "") {
+        if (!isPanelOpen()) {
+          return;
+        }
+        setPanelOpen(false);
+        if (reason === "chat_input") {
+          window.requestAnimationFrame(() => {
+            window.setTimeout(() => {
+              focusChatInput();
+            }, 0);
+          });
+        }
+      }
+
+      function openPanel() {
+        setPanelOpen(true);
+      }
+
+      function handlePointerDown(event) {
+        const target = event.target;
+        if (!isParentElement(target)) {
+          return;
+        }
+
+        if (isToggleTarget(target)) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (isPanelOpen()) {
+            closePanel();
+          } else {
+            openPanel();
+          }
+          return;
+        }
+
+        if (!isPanelOpen() || shouldIgnoreTarget(target)) {
+          return;
+        }
+
+        const reason = classifyTarget(target);
+        if (reason) {
+          closePanel(reason);
+        }
+      }
+
+      function handleFocusIn(event) {
+        if (!isPanelOpen()) {
+          return;
+        }
+
+        const target = event.target;
+        if (!isParentElement(target) || isToggleTarget(target) || shouldIgnoreTarget(target)) {
+          return;
+        }
+
+        if (classifyTarget(target) === "chat_input") {
+          closePanel("chat_input");
+        }
+      }
+
+      function handleRenderMessage(message) {
+        if (!message || message.type !== RENDER) {
+          return;
+        }
+        setPanelOpen(false);
+        setFrameHeight(0);
+      }
+
+      window.addEventListener("message", (event) => {
+        handleRenderMessage(event.data);
+      });
+
+      try {
+        const parentWindow = window.parent;
+        const registryKey = "__chatUploadGuardListeners";
+        const existing = parentWindow[registryKey];
+        if (existing) {
+          parentWindow.document.removeEventListener("pointerdown", existing.pointerdown, true);
+          parentWindow.document.removeEventListener("focusin", existing.focusin, true);
+        }
+        parentWindow.document.addEventListener("pointerdown", handlePointerDown, true);
+        parentWindow.document.addEventListener("focusin", handleFocusIn, true);
+        parentWindow[registryKey] = {
+          pointerdown: handlePointerDown,
+          focusin: handleFocusIn,
+        };
+      } catch (error) {
+        // Ignore if parent document is not accessible yet.
+      }
+
+      setPanelOpen(false);
+      setComponentReady();
+      setFrameHeight(0);
+    })();
+  </script>
+</body>
+</html>

@@ -1,192 +1,95 @@
 # WisdomSystem - 智扫通智能客服系统
 
-基于 **LangChain + LangGraph** 构建的企业级智能客服系统，支持高级 RAG 检索、四层记忆库和断点续聊功能。
+基于 **LangChain + LangGraph + FastAPI + Streamlit** 构建的企业级智能客服项目，当前版本重点解决了统一前后端架构、私有知识库隔离、会话持久化和聊天页上传栏交互。
 
 ---
 
-## 🚀 功能特性
+## 核心特性
 
-### 🔍 高级 RAG 检索
+### 1. 统一前后端架构
 
-| 技术 | 状态 | 说明 |
-|------|------|------|
-| **Contextual Retrieval** | ✅ 已实现 | 为每个 chunk 添加上下文描述（章节、主题、摘要） |
-| **Query 改写** | ✅ 已实现 | 三路改写：同义替换版、句式转换版、意图补全版 |
-| **语义校验** | ✅ 已实现 | 确保改写后的 Query 与原问题语义相似度 ≥ 0.8 |
-| **快速相似度预过滤** | ✅ 已实现 | 使用字符重叠率、长度比率、关键词重叠快速过滤 |
-| **BM25 混合召回** | ✅ 已实现 | 结合向量语义检索与 BM25 关键词匹配 |
-| **中文分词优化** | ⏳ 计划中 | 将 `.split()` 替换为 jieba 分词 |
-| **RRF 融合** | ✅ 已实现 | Reciprocal Rank Fusion 算法融合多源检索结果 |
-| **Rerank 精排** | ✅ 已实现 | 基于语义相似度的最终排序 |
-| **批量 embedding** | ⏳ 计划中 | 优化 Rerank 调用效率 |
+- Streamlit 仅作为前端客户端
+- FastAPI 作为唯一业务入口
+- 聊天通过 HTTP + SSE 调用后端
+- 知识库管理、会话管理、流式问答都走同一套 API
 
-**检索流程**：
-```
-用户提问 → 三路 Query 改写 → 语义校验过滤 → 向量检索 + BM25 检索 → RRF 融合 → Rerank 精排 → 返回 Top-5 文档
-```
+### 2. 高级 RAG 检索
 
-### 🧠 四层记忆库
+- Query 改写
+- 语义校验
+- 向量检索 + BM25 混合召回
+- RRF 融合
+- Rerank 精排
+- 共享知识库与私有知识库联合检索
 
-| 层级 | 类型 | 存储方式 | 用途 |
-|------|------|---------|------|
-| Layer 1 | 当前上下文 | Redis/内存缓存 | 短期对话上下文（最近10条消息） |
-| Layer 2 | 用户档案 | SQLite + Redis缓存 | 用户姓名、职业、偏好等结构化信息 |
-| Layer 3 | 近期摘要 | SQLite + Redis缓存 | 轻量级关键词提取 |
-| Layer 4 | 长期经验 | RAG 向量库 | 成功案例、失败尝试 |
+### 3. 私有知识库隔离
 
-### 💬 断点续聊
+- 上传文件支持按 `user_id` 写入私有知识库
+- RAG 只允许检索“共享知识 + 当前用户私有知识”
+- 不会检索其他用户的私有 chunk
+- 私有文件删除、chunk 列表和搜索都带用户边界
 
-- ✅ 支持会话持久化存储（文件 + Redis）
-- ✅ 跨会话记忆恢复，自动加载最近历史会话
-- ✅ 用户画像自动更新
-- ✅ 历史记录自动保存和加载
+### 4. 会话持久化与断点续聊
 
-### ⚡ 性能优化
+- 会话保存到 `data/sessions/*.json`
+- Redis 不可用时自动降级
+- 历史会话列表支持从磁盘 JSON 兜底恢复
+- 会话 ID 使用高精度时间戳 + UUID，避免快速创建冲突
 
-| 优化项 | 状态 | 说明 |
-|--------|------|------|
-| **单例模式** | ✅ 已实现 | 所有核心组件采用单例模式，避免重复初始化 |
-| **Redis 缓存** | ✅ 已实现 | 用户画像和会话摘要缓存，默认 24 小时过期 |
-| **Redis 降级** | ✅ 已实现 | Redis 不可用时自动降级到内存缓存，带日志提示 |
-| **记忆写入优化** | ✅ 已实现 | 流式输出时只在完整回答后写入一次记忆 |
-| **系统消息优化** | ✅ 已实现 | 修复多系统消息冲突问题 |
+### 5. 聊天页固定上传栏
 
-### 🔧 工具系统
-
-| 工具 | 说明 |
-|------|------|
-| `rag_summarize` | 从向量存储中检索参考资料 |
-| `get_weather` | 获取指定城市的天气信息 |
-| `get_user_location` | 获取用户所在城市（当前使用默认值） |
-| `get_user_id` | 获取用户ID（当前使用默认值） |
-| `get_current_month` | 获取当前月份 |
-| `fetch_external_data` | 获取用户使用记录数据 |
-| `fill_context_for_report` | 触发报告生成上下文注入 |
-
-### 📚 知识库管理
-
-- ✅ FastAPI 管理接口：上传文档、查看 chunk、检索预览、删除 chunk、重建索引
-- ✅ Streamlit 管理页面：侧边栏切换到“知识库管理”即可使用
-- ✅ 支持 `.txt` 和 `.pdf` 文档
-- ✅ 上传文件保存到 `data/knowledge_uploads/`
-- ✅ 使用 MD5 去重，避免重复写入向量库
-- ✅ 删除策略为删除向量库 chunk，不删除原始文件
-
-### 🛡️ 安全特性
-
-- ✅ SQL 注入防护：使用 JSON 解析替代 `eval`
-- ✅ 敏感信息保护：API Key 通过环境变量配置
-- ✅ 输入验证：工具参数类型注解和校验
+- 上传入口为输入框左侧 `+`
+- 上传面板固定在输入框上方
+- 点击聊天区或输入框自动收起
+- 点击侧边栏不影响上传栏
+- 开合改为纯前端临时状态，不触发页面 `running`
 
 ---
 
-## 📊 RAG 评估结果
+## 当前版本重点更新
 
-**当前测试结果（基于 50 个刁钻测试用例）：**
+### v1.5
 
-| 指标 | 结果 |
-|------|------|
-| **Recall@1** | 58.0% |
-| **Recall@3** | 88.0% |
-| **Recall@5** | 90.0% |
-| **MRR** | 0.712 |
-| **忠诚度** | 100% |
+- 私有知识库按用户隔离检索
+- RAG 缓存按用户范围隔离
+- MD5 去重改为 `scope + md5`
+- 会话列表支持 Redis 丢失后的磁盘 JSON 恢复
+- 聊天页上传栏固定到底部，开合不再触发 Streamlit rerun
 
-**运行评估命令：**
-```bash
-python tests/rag_evaluation.py
-```
+详细记录见 `CHANGELOG.md`。
 
 ---
 
-## 🛠️ 技术栈
+## 项目结构
 
-| 模块 | 技术 | 版本 |
-|------|------|------|
-| **框架** | LangChain | 0.3.7 |
-| **工作流** | LangGraph | 0.2.50 |
-| **向量数据库** | ChromaDB | 0.5.15 |
-| **前端** | Streamlit | 1.40.1 |
-| **API 后端** | FastAPI / Uvicorn | - |
-| **LLM** | 通义千问 (DashScope) | - |
-| **缓存** | Redis / SimpleCache | 5.0.1 |
-| **数据库** | SQLite | - |
-| **数值计算** | NumPy | 1.26.4 |
-| **中文分词** | jieba | 0.42.1 |
-
----
-
-## 📁 项目结构
-
-```
+```text
 WisdomSystem/
-├── agent/                  # ReAct Agent 核心
-│   ├── tools/              # 工具定义
-│   │   ├── agent_tools.py  # 业务工具（RAG检索、天气查询等）
-│   │   └── middleware.py   # 中间件（工具监控、提示词切换）
-│   └── react_agent.py      # ReAct Agent 实现（流式输出）
-├── rag/                    # RAG 检索模块
-│   ├── contextual_enhancer.py  # Contextual Retrieval
-│   ├── question_splitter.py    # 按问题切分文档
-│   ├── query_rewriter.py       # Query 改写
-│   ├── semantic_checker.py     # 语义相似度校验
-│   ├── bm25_retriever.py       # BM25 检索
-│   ├── rrf_fusion.py           # RRF 融合算法
-│   ├── reranker.py             # Rerank 精排
-│   ├── vector_store.py         # 向量存储
-│   └── rag_service.py          # RAG 服务入口
-├── memory/                 # 记忆管理
-│   ├── layers.py           # 四层记忆定义
-│   ├── memory_manager.py   # 记忆管理器（单例模式）
-│   └── session_manager.py  # 会话管理
-├── database/               # 数据库模块
-│   ├── sqlite_db.py        # SQLite 数据存储（单例模式，JSON解析）
-│   └── redis_cache.py      # Redis 缓存（单例模式，支持降级）
-├── api/                    # FastAPI 后端接口
-│   ├── main.py             # FastAPI 应用入口
-│   └── routes/             # 聊天和知识库管理路由
-├── services/               # 服务层
-│   ├── chat_service.py     # 聊天服务
-│   └── knowledge_service.py # 知识库管理服务
-├── model/                  # 模型工厂
-│   └── factory.py          # 通义千问模型初始化
-├── config/                 # 配置文件
-│   ├── agent.yml           # Agent 配置
-│   ├── chroma.yml          # 向量库配置
-│   ├── rag.yml             # RAG 配置
-│   └── prompts.yml         # 提示词配置
-├── prompts/                # 提示词模板
-│   ├── main_prompt.txt     # 主提示词
-│   ├── rag_summarize.txt   # RAG 总结提示词
-│   └── report_prompt.txt   # 报告生成提示词
-├── data/                   # 知识库文档
-│   ├── knowledge_uploads/  # 管理页面/API 上传的知识库文档
-│   ├── external/           # 外部数据
-│   │   └── records.csv     # 用户使用记录（CSV格式）
-│   ├── 扫地机器人100问.pdf
-│   ├── 扫地机器人100问2.txt
-│   ├── 扫拖一体机器人100问.txt
-│   ├── 故障排除.txt
-│   ├── 维护保养.txt
-│   └── 选购指南.txt
-├── tests/                  # 测试模块
-│   ├── rag_evaluation.py   # RAG 评估脚本（需配置API Key）
-│   └── test_cases.json     # 测试用例（50个）
-├── utils/                  # 工具函数
-│   ├── config_handler.py   # 配置加载
-│   ├── prompt_loader.py    # 提示词加载
-│   ├── logger_handler.py   # 日志处理
-│   └── path_tool.py        # 路径工具
-├── app.py                  # Streamlit 前端入口
-├── requirements.txt        # 依赖清单（包含所有必需依赖）
-├── .env                    # 环境变量配置（需自行配置，不提交）
-├── AGENTS.md               # Agent 系统设计文档
-└── README.md               # 项目说明文档
+├─ agent/                  # ReAct Agent 与工具
+├─ api/                    # FastAPI 入口与路由
+├─ database/               # Redis / SQLite 封装
+├─ frontend/               # Streamlit -> FastAPI 客户端与前端桥接
+├─ memory/                 # 四层记忆与会话管理
+├─ rag/                    # RAG 检索与向量库
+├─ services/               # 聊天与知识库服务层
+├─ data/                   # 知识库数据与上传目录
+├─ tests/                  # 评估与测试脚本
+├─ app.py                  # Streamlit 前端入口
+├─ AGENTS.md               # Agent 维护说明
+└─ CHANGELOG.md            # 版本更新记录
 ```
 
 ---
 
-## 🔧 安装步骤
+## 环境要求
+
+- Python 3.11
+- 推荐 Conda 环境：`wisdomsystem-py311`
+- 可选 Redis
+- DashScope API Key
+
+---
+
+## 安装与启动
 
 ### 1. 克隆项目
 
@@ -195,17 +98,11 @@ git clone https://github.com/wwy2900/wisdomsystem.git
 cd wisdomsystem
 ```
 
-### 2. 创建虚拟环境
+### 2. 创建环境
 
 ```bash
-# 使用 conda（推荐）
 conda create -n wisdomsystem-py311 python=3.11
 conda activate wisdomsystem-py311
-
-# 或使用 venv
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
 ```
 
 ### 3. 安装依赖
@@ -214,178 +111,96 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-### 4. 配置环境变量
+### 4. 配置 `.env`
 
-创建并编辑 `.env` 文件：
-
-```bash
-# Windows: 使用记事本或 IDE 打开
-notepad .env
-
-# Linux/Mac: 使用编辑器
-nano .env
-```
-
-`.env` 文件内容：
 ```env
-# 通义千问 API 密钥（必填）
 DASHSCOPE_API_KEY=your_api_key_here
+FASTAPI_API_KEY=your_fastapi_api_key
 
-# Redis 配置（可选，不配置则使用内存缓存）
+REDIS_ENABLED=false
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
+REDIS_CONNECT_TIMEOUT=1
+REDIS_SOCKET_TIMEOUT=1
 ```
 
-**获取 API Key**：
-1. 访问 [阿里云 DashScope 控制台](https://dashscope.console.aliyun.com/)
-2. 注册/登录阿里云账号
-3. 创建 API Key（免费额度：100万 Token/月）
+### 5. 启动服务
 
-### 5. Redis 配置（可选）
+先启动 Redis（可选）：
 
-Redis 用于缓存和会话管理，不配置则自动降级到内存缓存。
-
-**Windows 安装 Redis**：
-1. 下载 Redis：https://github.com/tporadowski/redis/releases
-2. 解压到 `D:\Redis`
-3. 运行：`D:\Redis\redis-server.exe redis.windows.conf`
-4. 验证：`D:\Redis\redis-cli.exe ping`（返回 PONG 表示成功）
-
-**Docker 安装 Redis**：
 ```bash
-docker run -d -p 6379:6379 redis
+D:\Redis\redis-server.exe
 ```
 
-### 6. 运行应用
+再启动 FastAPI：
 
 ```bash
-# 启动 Streamlit 前端
-streamlit run app.py --server.port 8501
-```
-
-访问 **http://localhost:8501** 即可使用。
-
-**FastAPI 后端启动：**
-
-```bash
+conda activate wisdomsystem-py311
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-访问接口文档：
-
-```text
-http://localhost:8000/docs
-```
-
-### 7. 首次运行说明
-
-首次运行时，系统会自动执行以下操作：
-1. **加载知识库文档**：从 `data/` 目录读取所有文档
-2. **切分文档**：使用 `QuestionBasedSplitter` 按问题切分
-3. **上下文增强**：为每个 chunk 添加上下文描述
-4. **构建向量库**：将文档向量存储到 ChromaDB（`chroma_db/` 目录）
-
-**首次运行时间**：约 5-10 分钟（取决于文档数量和网络速度）
-
-### 8. 运行 RAG 评估
+最后启动 Streamlit：
 
 ```bash
-# 设置环境变量（Windows）
-set DASHSCOPE_API_KEY=your_api_key_here
+conda activate wisdomsystem-py311
+streamlit run app.py --server.port 8501
+```
 
-# 设置环境变量（Linux/Mac）
-export DASHSCOPE_API_KEY=your_api_key_here
+访问地址：
 
-# 运行评估
+```text
+FastAPI Docs: http://localhost:8000/docs
+Streamlit:    http://localhost:8501
+```
+
+---
+
+## 主要接口
+
+### 聊天与会话
+
+- `POST /api/v1/sessions`
+- `GET /api/v1/users/{user_id}/sessions`
+- `GET /api/v1/sessions/{session_id}`
+- `POST /api/v1/chat`
+- `POST /api/v1/chat/stream`
+
+### 知识库
+
+- `POST /api/v1/knowledge/documents/upload`
+- `GET /api/v1/knowledge/chunks`
+- `GET /api/v1/knowledge/search`
+- `GET /api/v1/knowledge/users/{user_id}/chunks`
+- `DELETE /api/v1/knowledge/chunks/{doc_id}`
+- `POST /api/v1/knowledge/rebuild`
+
+---
+
+## 常用命令
+
+语法检查：
+
+```bash
+conda activate wisdomsystem-py311
+python -m compileall agent memory rag database utils model api services frontend app.py tests
+```
+
+RAG 评估：
+
+```bash
+conda activate wisdomsystem-py311
 python tests/rag_evaluation.py
 ```
 
-评估结果会保存到 `rag_evaluation_results.json`。
-
 ---
 
-## 🔗 知识库文档
+## 维护要点
 
-项目内置扫地机器人相关知识库：
-- 产品问答（100问 × 3）
-- 故障排除指南
-- 维护保养建议
-- 选购指南
+- Streamlit 前端不要直接导入 Agent 或服务层
+- 私有知识检索必须保持用户隔离
+- 删除 chunk 不删除原始文件
+- 重建索引前必须明确提示风险
+- `.env`、数据库、向量库、上传文件、日志、本地调试产物不要提交
 
-### 知识库管理接口
-
-FastAPI 提供以下管理接口，默认复用 `X-API-Key` 鉴权：
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v1/knowledge/documents/upload` | 上传 `.txt` / `.pdf` 并立即入库 |
-| GET | `/api/v1/knowledge/chunks` | 分页查看向量库 chunk |
-| GET | `/api/v1/knowledge/search` | 检索知识库命中内容 |
-| DELETE | `/api/v1/knowledge/chunks/{doc_id}` | 删除指定 chunk，不删除原始文件 |
-| POST | `/api/v1/knowledge/rebuild` | 清空并重建知识库索引 |
-
-上传示例：
-
-```bash
-curl -X POST http://localhost:8000/api/v1/knowledge/documents/upload \
-  -H "X-API-Key: your_api_key_here" \
-  -F "file=@./data/维护保养.txt"
-```
-
-检索示例：
-
-```bash
-curl "http://localhost:8000/api/v1/knowledge/search?query=不回充&k=5" \
-  -H "X-API-Key: your_api_key_here"
-```
-
----
-
-## 📝 配置说明
-
-### agent.yml
-
-```yaml
-agent_name: WisdomAgent
-max_iterations: 10
-temperature: 0.7
-external_data_path: data/external/records.csv
-```
-
-### rag.yml
-
-```yaml
-chat_model_name: qwen-max
-embedding_model_name: text-embedding-v3
-similarity_threshold: 0.8
-top_k: 5
-```
-
-### chroma.yml
-
-```yaml
-persist_directory: ./chroma_db
-collection_name: knowledge_base
-k: 10
-```
-
----
-
-## 📄 许可证
-
-MIT License
-
----
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
----
-
-**项目地址**：https://github.com/wwy2900/wisdomsystem
-
-**文档说明**：
-- `AGENTS.md` - Agent 系统设计文档，包含架构说明和扩展指南
-- `PROJECT_IMPROVEMENT_PLAN.md` - 项目改进计划，包含待办事项和验收标准
+更多维护说明见 `AGENTS.md`。

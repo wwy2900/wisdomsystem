@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from api.routes.chat import router as chat_router
 from api.routes.knowledge import router as knowledge_router
 from api.schemas import HealthResponse
@@ -28,11 +28,14 @@ app = FastAPI(title="智扫通 API", description="智扫通智能客服 FastAPI 
 
 # 健康检查（不鉴权）
 @app.get("/health", response_model=HealthResponse)
-def health():
+def health(request: Request):
+    chat_service = getattr(request.app.state, "chat_service", None)
+    redis_cache = getattr(chat_service, "redis_cache", None)
+    cache_backend = getattr(redis_cache, "backend", "unknown")
     return HealthResponse(
         status="ok",
-        agent_ready=True,
-        cache_backend="redis",
+        agent_ready=chat_service is not None,
+        cache_backend=cache_backend,
     )
 
 # 业务路由（鉴权）

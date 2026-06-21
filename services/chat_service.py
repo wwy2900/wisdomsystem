@@ -39,7 +39,7 @@ class ChatService:
         """流式聊天：yield (event_type, content) 元组
 
         event_type:
-            - "answer_delta": 最终回答片段
+            - "answer_delta": 最终回答片段（逐 token）
             - "tool_event": 工具调用/返回事件
         """
         # 加载现有会话消息
@@ -52,17 +52,18 @@ class ChatService:
         # 执行流式查询
         answer_parts: list[str] = []
         for chunk in self.agent.execute_stream(message, user_id=user_id, session_id=session_id):
-            stripped = chunk.lstrip()
-            if stripped.startswith("🔧") or stripped.startswith("✅"):
+            if chunk.startswith("[TOOL_RESULT") or chunk.startswith("[TOOL_THINK]"):
+                yield ("tool_event", chunk[len("[TOOL_THINK]"):] if chunk.startswith("[TOOL_THINK]") else chunk)
+            elif chunk.startswith("[TOOL"):
                 yield ("tool_event", chunk)
             else:
                 answer_parts.append(chunk)
                 yield ("answer_delta", chunk)
 
         # 保存 assistant 回答到会话
-        assistant_response = "".join(answer_parts)
+        assistant_response = "".join(answer_parts).strip()
         if assistant_response:
             messages.append({"role": "assistant", "content": assistant_response})
 
         # 保存会话
-        self.session_manager.save_session(session_id, messages)
+        self.session_manager.save_session(session_id, messages, user_id=user_id)

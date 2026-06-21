@@ -1,52 +1,91 @@
 # Changelog
 
-## v1.3 (2026-06-20)
+格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本。
 
-### 新增
-- FastAPI 后端服务：SSE 流式聊天、会话管理、API Key 鉴权
-- 知识库管理模块：上传文档、分页查看 chunk、检索预览、删除 chunk、重建索引
-- Streamlit 知识库管理界面：侧边栏页面切换，4 个标签页（上传/检索/Chunk管理/重建）
-- ChatService 和 KnowledgeService 统一服务层封装
-- 并行向量+BM25 混合检索（ThreadPoolExecutor）
-- 两级缓存：本地 dict 缓存 + Redis 缓存，TTL 86400s
-- jieba 中文分词优化 BM25 检索，lru_cache 缓存分词结果
-- Reranker 批量 embedding（适配 DashScope batch_size=10 限制）
-- 语义检查器重试机制（指数退避，最多 3 次）
-- 向量库管理方法：delete_document、clear_collection、_rebuild_md5_store
-- 测试工具：check_doc_ids、rebuild_and_update、test_integration、update_cases
+---
 
-### 变更
-- requirements.txt 新增 fastapi/uvicorn/sse-starlette/python-multipart
-- .env 新增 FASTAPI_API_KEY
-- 懒加载模式优化 RAG 组件初始化
-- ContextualEnhancer 改为配置驱动（chroma.yml contextual_enhancer 开关）
-- 流式输出增加工具调用标记（🔧/✅）
+## [v1.5] - 2026-06-21
 
-## v1.2 (2026-06-19)
+### Added
 
-### 新增
-- 流式输出修复，中间件接入
-- CSV 解析改进（csv.DictReader 替代字符串 split）
+- 私有知识库按 `user_id` 隔离上传、检索、删除和列表查询
+- 新增用户私有 chunk 查询接口：`GET /api/v1/knowledge/users/{user_id}/chunks`
+- 聊天页固定上传栏前端桥接组件：`frontend/chat_upload_guard.py`
+- 输入框左侧 `+` 上传入口与固定上传面板
 
-### 修复
-- 安全修复：移除硬编码 API Key，eval 改 JSON 解析
-- Agent 稳定性：工具返回值统一为字符串
-- 依赖补齐
+### Changed
 
-## v1.1 (2026-06-19)
+- `ReactAgent` 为每次请求构造用户作用域的 `rag_summarize` 工具
+- `RagSummarizeService.rag_summarize()` 和 `retriever_docs()` 支持 `user_id`
+- RAG 缓存 key 改为按用户范围隔离
+- 会话 ID 改为高精度时间戳 + UUID 短后缀
+- `SessionManager.list_user_sessions()` 增加 JSON 扫描兜底并重建 Redis 索引
+- MD5 去重从“全局 md5”改为“scope + md5”
+- Streamlit 聊天页上传栏开合状态改为纯前端临时状态，不再触发 rerun
 
-### 新增
-- 单例模式优化，避免重复初始化重型组件
-- 系统消息冲突修复
-- 性能优化：响应速度和内存占用改善
+### Fixed
 
-## v1.0 (初始版本)
+- 修复不同用户间私有知识可能串查的问题
+- 修复 Redis / SimpleCache 丢失后历史会话列表缺失的问题
+- 修复不同用户上传同内容文件时被错误全局去重的问题
+- 修复聊天页上传栏展开后无法收起、输入框失焦、点击侧边栏误收起的问题
+- 修复上传栏开合触发右上角 `running` 的问题
 
-### 新增
-- 基础 Agent 框架：LangChain ReAct Agent + 流式对话
-- 7 个工具：rag_summarize、get_weather、get_user_location、get_user_id、get_current_month、fetch_external_data、fill_context_for_report
-- 四层记忆系统：L1 对话上下文、L2 用户画像、L3 近期摘要、L4 长期经验
-- RAG 检索：向量检索、BM25、Query 改写、RRF 融合、Rerank 精排
-- Streamlit 聊天界面：会话管理、断点续聊、思考过程展示
-- Redis 缓存 + SQLite 数据库
-- ChromaDB 向量库
+---
+
+## [v1.4] - 2026-06-21
+
+### Changed
+
+- Streamlit 改为纯前端客户端，通过 `frontend/api_client.py` 调用 FastAPI
+- FastAPI 成为统一业务入口
+- 聊天页面改为 SSE 流式输出
+
+---
+
+## [v1.3] - 2026-06-20
+
+### Added
+
+- FastAPI 后端入口与聊天、知识库路由
+- `ChatService` 与 `KnowledgeService`
+- Streamlit 知识库管理页
+- 知识库上传、检索、删除 chunk、重建索引能力
+
+### Changed
+
+- RAG 召回、缓存和 BM25 检索性能优化
+
+---
+
+## [v1.2] - 2026-06-19
+
+### Fixed
+
+- 移除硬编码密钥
+- 修复流式输出异常处理
+- 用 `json.loads()` 替代危险的 `eval()`
+- 修复 CSV 外部数据解析逻辑
+
+---
+
+## [v1.1] - 2026-06-19
+
+### Changed
+
+- 核心组件单例化
+- 修复系统消息冲突
+- 优化流式输出性能
+
+---
+
+## [v1.0] - 初始版本
+
+### Added
+
+- LangChain ReAct Agent
+- 四层记忆体系
+- RAG 检索链路
+- Streamlit 前端
+- Redis / 内存缓存降级
+- 断点续聊与会话管理

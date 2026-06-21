@@ -71,6 +71,15 @@ class KnowledgeChunkListResponse(BaseModel):
     chunks: list[KnowledgeChunk]
 
 
+class UserChunkListResponse(BaseModel):
+    """某用户的私有 chunk 列表"""
+    user_id: str
+    total: int
+    limit: int
+    offset: int
+    chunks: list[KnowledgeChunk]
+
+
 class KnowledgeSearchResponse(BaseModel):
     query: str
     results: list[KnowledgeChunk]

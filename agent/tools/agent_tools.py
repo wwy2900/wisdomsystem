@@ -1,6 +1,7 @@
 import os
 import json
 import csv
+from contextvars import ContextVar
 from datetime import datetime
 from utils.logger_handler import logger
 from langchain_core.tools import tool
@@ -10,16 +11,30 @@ from utils.config_handler import agent_conf
 from utils.path_tool import get_abs_path
 
 rag = RagSummarizeService()
+current_tool_user_id: ContextVar[str | None] = ContextVar("current_tool_user_id", default=None)
 
 external_data = {}
 
 REQUIRED_FIELDS = ["user_id", "特征", "效率", "耗材", "对比", "时间"]
 
 
+def set_tool_user_id(user_id: str | None):
+    """Set request-scoped user id for tools invoked by the agent."""
+    return current_tool_user_id.set(user_id)
+
+
+def reset_tool_user_id(token):
+    current_tool_user_id.reset(token)
+
+
+def rag_summarize_for_user(query: str, user_id: str | None = None) -> str:
+    return rag.rag_summarize(query, user_id=user_id)
+
+
 @tool
 def rag_summarize(query: str) -> str:
     """从向量存储中检索参考资料"""
-    return rag.rag_summarize(query)
+    return rag_summarize_for_user(query, current_tool_user_id.get())
 
 
 @tool

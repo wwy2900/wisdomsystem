@@ -10,6 +10,8 @@ from utils.file_handler import pdf_loader, txt_loader, listdir_with_allowed_type
 from utils.logger_handler import logger
 
 import os
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import quote
 
 
 class VectorStoreService:
@@ -39,15 +41,29 @@ class VectorStoreService:
         if not os.path.exists(md5_path):
             open(md5_path, "w", encoding="utf-8").close()
 
-    def _check_file_exists(self, md5_for_check: str) -> bool:
-        self._ensure_md5_store()
-        with open(self._get_md5_path(), "r", encoding="utf-8") as f:
-            return any(line.strip() == md5_for_check for line in f)
+    def _md5_scope(self, user_id: str | None = None) -> str:
+        return quote((user_id or "__shared__").strip() or "__shared__", safe="")
 
-    def _save_file_md5(self, md5_for_save: str):
+    def _md5_record(self, md5_hex: str, user_id: str | None = None) -> str:
+        return f"{self._md5_scope(user_id)}:{md5_hex}"
+
+    def _check_file_exists(self, md5_for_check: str, user_id: str = "__shared__") -> bool:
+        self._ensure_md5_store()
+        expected_record = self._md5_record(md5_for_check, user_id)
+        with open(self._get_md5_path(), "r", encoding="utf-8") as f:
+            for line in f:
+                record = line.strip()
+                if record == expected_record:
+                    return True
+                # Compatibility with old md5.txt files that stored shared md5 values only.
+                if user_id == "__shared__" and record == md5_for_check:
+                    return True
+        return False
+
+    def _save_file_md5(self, md5_for_save: str, user_id: str = "__shared__"):
         self._ensure_md5_store()
         with open(self._get_md5_path(), "a", encoding="utf-8") as f:
-            f.write(md5_for_save + "\n")
+            f.write(self._md5_record(md5_for_save, user_id) + "\n")
 
     def _get_file_documents(self, read_path: str) -> list[Document]:
         lower_path = read_path.lower()
@@ -59,7 +75,7 @@ class VectorStoreService:
 
         return []
 
-    def _batch_add_documents(self, documents: list[Document]) -> list[str]:
+    def _batch_add_documents(self, documents: list[Document], user_id: str = "__shared__") -> list[str]:
         """分批添加文档，每批最多10个，为每个文档设置独立的 doc_id（序号格式）"""
         added_doc_ids = []
         for i in range(0, len(documents), self.batch_size):
@@ -70,12 +86,18 @@ class VectorStoreService:
                 if not doc.metadata:
                     doc.metadata = {}
                 doc.metadata["doc_id"] = doc_id
+                doc.metadata["user_id"] = user_id
                 added_doc_ids.append(doc_id)
             self.vector_store.add_documents(batch)
         return added_doc_ids
 
-    def add_file(self, file_path: str) -> dict:
-        """加载单个 txt/pdf 文件并写入向量库，使用 MD5 去重。"""
+    def add_file(self, file_path: str, user_id: str = "__shared__") -> dict:
+        """加载单个 txt/pdf 文件并写入向量库，使用 MD5 去重。
+
+        Args:
+            file_path: 文件路径
+            user_id: 归属用户，共享库为 \"__shared__\"
+        """
         allowed_types = tuple(f".{t.lstrip('.')}" for t in chroma_conf["allow_knowledge_file_type"])
         if not file_path.lower().endswith(allowed_types):
             return {
@@ -100,7 +122,7 @@ class VectorStoreService:
                 "chunk_ids": [],
             }
 
-        if self._check_file_exists(md5_hex):
+        if self._check_file_exists(md5_hex, user_id=user_id):
             logger.info(f"[加载知识库]{file_path}内容已经存在知识库内，跳过")
             return {
                 "file_path": file_path,
@@ -145,9 +167,9 @@ class VectorStoreService:
             doc.metadata["source_path"] = file_path
             doc.metadata["file_md5"] = md5_hex
 
-        chunk_ids = self._batch_add_documents(split_documents)
-        self._save_file_md5(md5_hex)
-        logger.info(f"[加载知识库]{file_path} 内容加载成功，共 {len(chunk_ids)} 个 chunk")
+        chunk_ids = self._batch_add_documents(split_documents, user_id=user_id)
+        self._save_file_md5(md5_hex, user_id=user_id)
+        logger.info(f"[加载知识库]{file_path} 内容加载成功，共 {len(chunk_ids)} 个 chunk, user_id={user_id}")
 
         return {
             "file_path": file_path,
@@ -194,9 +216,11 @@ class VectorStoreService:
             })
         return results
 
-    def list_chunks(self, limit: int = 20, offset: int = 0) -> dict:
-        """分页获取向量库 chunk。"""
+    def list_chunks(self, limit: int = 20, offset: int = 0, user_id: str | None = None) -> dict:
+        """分页获取向量库 chunk，可选按 user_id 过滤。"""
         all_docs = self.get_all_documents_with_ids()
+        if user_id is not None:
+            all_docs = [d for d in all_docs if d.get("metadata", {}).get("user_id") == user_id]
         total = len(all_docs)
         start = max(offset, 0)
         end = start + max(limit, 0)
@@ -207,8 +231,15 @@ class VectorStoreService:
             "chunks": all_docs[start:end],
         }
 
-    def search_chunks(self, query: str, k: int = 5) -> list[dict]:
-        """检索知识库 chunk，用于管理端预览命中结果。"""
+    def search_chunks(self, query: str, k: int = 5, user_id: str | None = None) -> list[dict]:
+        """检索知识库 chunk，用于管理端预览命中结果。
+
+        Args:
+            user_id: 可选，传入时只检索共享库+该用户私有库
+        """
+        if user_id:
+            return self.search_user_knowledge(user_id, query, k)
+
         docs = self.vector_store.similarity_search(query, k=k)
         results = []
         for doc in docs:
@@ -220,10 +251,75 @@ class VectorStoreService:
             })
         return results
 
-    def delete_document(self, doc_id: str):
-        """删除指定 doc_id 的向量库 chunk，不删除原始文件。"""
-        self.vector_store._collection.delete(where={"doc_id": doc_id})
-        logger.info(f"[向量库]已删除文档: {doc_id}")
+    def retrieve_documents(self, query: str, k: int = 10, user_id: str | None = None) -> list[Document]:
+        """Retrieve shared documents plus the current user's private documents."""
+        if user_id:
+            return self.retrieve_user_documents(user_id, query, k)
+        return self.vector_store.similarity_search(query, k=k, filter={"user_id": "__shared__"})
+
+    def retrieve_user_documents(self, user_id: str, query: str, k: int = 10) -> list[Document]:
+        """Return shared + user-owned documents, never documents owned by other users."""
+
+        def _search_shared():
+            return self.vector_store.similarity_search(
+                query, k=k, filter={"user_id": "__shared__"}
+            )
+
+        def _search_user():
+            return self.vector_store.similarity_search(
+                query, k=k, filter={"user_id": user_id}
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            shared_docs = pool.submit(_search_shared)
+            user_docs = pool.submit(_search_user)
+            docs = shared_docs.result() + user_docs.result()
+
+        seen_content = set()
+        merged = []
+        for doc in docs:
+            content_key = doc.page_content.strip()[:100]
+            if content_key in seen_content:
+                continue
+            seen_content.add(content_key)
+            merged.append(doc)
+        return merged[:k]
+
+    def search_user_knowledge(self, user_id: str, query: str, k: int = 5) -> list[dict]:
+        """检索共享知识库 + 用户私有知识库，合并去重返回。
+
+        Args:
+            user_id: 用户 ID
+            query: 检索查询
+            k: 返回结果数量
+        """
+        merged = []
+        for doc in self.retrieve_user_documents(user_id, query, k):
+            metadata = doc.metadata or {}
+            merged.append({
+                "doc_id": metadata.get("doc_id", ""),
+                "content": doc.page_content,
+                "metadata": metadata,
+            })
+
+        return merged[:k]
+
+    def list_user_chunks(self, user_id: str, limit: int = 100, offset: int = 0) -> dict:
+        """列出某用户的所有私有 chunk。"""
+        return self.list_chunks(limit=limit, offset=offset, user_id=user_id)
+
+    def delete_document(self, doc_id: str, user_id: str | None = None):
+        """删除指定 doc_id 的向量库 chunk，不删除原始文件。
+
+        Args:
+            doc_id: 要删除的 doc_id
+            user_id: 可选，传入时校验 chunk 归属
+        """
+        where = {"doc_id": doc_id}
+        if user_id:
+            where["user_id"] = user_id
+        self.vector_store._collection.delete(where=where)
+        logger.info(f"[向量库]已删除文档: {doc_id} (user_id={user_id or 'any'})")
 
     def clear_collection(self):
         """清空向量库，用于重建"""
@@ -244,7 +340,9 @@ class VectorStoreService:
         )
         with open(md5_path, "w", encoding="utf-8") as f:
             for path in allowed_files:
-                f.write(get_file_md5_hex(path) + "\n")
+                md5_hex = get_file_md5_hex(path)
+                if md5_hex:
+                    f.write(self._md5_record(md5_hex, "__shared__") + "\n")
 
 
 if __name__ == '__main__':

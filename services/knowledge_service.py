@@ -2,6 +2,7 @@
 import os
 import re
 from typing import Iterable
+from urllib.parse import quote, unquote
 
 from rag.vector_store import VectorStoreService
 from utils.config_handler import chroma_conf
@@ -37,43 +38,63 @@ class KnowledgeService:
             allowed = ", ".join(sorted(self.allowed_extensions))
             raise ValueError(f"Unsupported file type: {ext or 'none'}, allowed: {allowed}")
 
-    def _iter_source_files(self) -> Iterable[str]:
+    def _safe_user_dir(self, user_id: str) -> str:
+        return quote((user_id or "__shared__").strip() or "__shared__", safe="")
+
+    def _iter_source_files(self) -> Iterable[tuple[str, str]]:
         allowed_types = tuple(chroma_conf["allow_knowledge_file_type"])
         data_files = listdir_with_allowed_type(get_abs_path(chroma_conf["data_path"]), allowed_types)
-        upload_files = listdir_with_allowed_type(self.upload_dir, allowed_types)
         seen = set()
-        for path in list(data_files) + list(upload_files):
+        for path in data_files:
             abs_path = os.path.abspath(path)
             if abs_path in seen:
                 continue
             seen.add(abs_path)
-            yield path
+            yield path, "__shared__"
 
-    def add_uploaded_document(self, filename: str, content: bytes) -> dict:
+        for current_dir, _, files in os.walk(self.upload_dir):
+            rel_dir = os.path.relpath(current_dir, self.upload_dir)
+            user_id = "__shared__" if rel_dir == "." else unquote(rel_dir.split(os.sep, 1)[0])
+            for filename in files:
+                if not filename.endswith(allowed_types):
+                    continue
+                path = os.path.join(current_dir, filename)
+                abs_path = os.path.abspath(path)
+                if abs_path in seen:
+                    continue
+                seen.add(abs_path)
+                yield path, user_id
+
+    def add_uploaded_document(self, filename: str, content: bytes, user_id: str = "__shared__") -> dict:
         safe_name = self._safe_filename(filename)
         self._validate_extension(safe_name)
 
-        target_path = os.path.join(self.upload_dir, safe_name)
+        upload_dir = os.path.join(self.upload_dir, self._safe_user_dir(user_id)) if user_id != "__shared__" else self.upload_dir
+        os.makedirs(upload_dir, exist_ok=True)
+        target_path = os.path.join(upload_dir, safe_name)
         with open(target_path, "wb") as f:
             f.write(content)
 
-        result = self.vector_store.add_file(target_path)
+        result = self.vector_store.add_file(target_path, user_id=user_id)
         result["saved_path"] = target_path
         return result
 
-    def add_document(self, file_path: str) -> dict:
+    def add_document(self, file_path: str, user_id: str = "__shared__") -> dict:
         self._validate_extension(file_path)
-        return self.vector_store.add_file(file_path)
+        return self.vector_store.add_file(file_path, user_id=user_id)
 
-    def list_chunks(self, limit: int = 20, offset: int = 0) -> dict:
-        return self.vector_store.list_chunks(limit=limit, offset=offset)
+    def list_chunks(self, limit: int = 20, offset: int = 0, user_id: str | None = None) -> dict:
+        return self.vector_store.list_chunks(limit=limit, offset=offset, user_id=user_id)
 
-    def search_chunks(self, query: str, k: int = 5) -> list[dict]:
-        return self.vector_store.search_chunks(query=query, k=k)
+    def search_chunks(self, query: str, k: int = 5, user_id: str | None = None) -> list[dict]:
+        return self.vector_store.search_chunks(query=query, k=k, user_id=user_id)
 
-    def delete_chunk(self, doc_id: str) -> dict:
+    def list_user_chunks(self, user_id: str, limit: int = 100, offset: int = 0) -> dict:
+        return self.vector_store.list_user_chunks(user_id, limit=limit, offset=offset)
+
+    def delete_chunk(self, doc_id: str, user_id: str | None = None) -> dict:
         before_total = self.vector_store.list_chunks(limit=1, offset=0)["total"]
-        self.vector_store.delete_document(doc_id)
+        self.vector_store.delete_document(doc_id, user_id=user_id)
         after_total = self.vector_store.list_chunks(limit=1, offset=0)["total"]
         return {
             "doc_id": doc_id,
@@ -90,9 +111,9 @@ class KnowledgeService:
         chunk_count = 0
         results = []
 
-        for file_path in self._iter_source_files():
+        for file_path, user_id in self._iter_source_files():
             file_count += 1
-            result = self.vector_store.add_file(file_path)
+            result = self.vector_store.add_file(file_path, user_id=user_id)
             results.append(result)
             if result.get("skipped"):
                 skipped_count += 1
