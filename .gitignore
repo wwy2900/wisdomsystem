@@ -54,9 +54,10 @@ rag_evaluation_results.json
 *.bak
 *.cache
 
-# Documentation (only README.md is public)
+# Documentation (only README.md and AGENTS.md are public)
 *.md
 !README.md
+!AGENTS.md
 
 # IDE internal
 .trae/
