@@ -62,6 +62,13 @@ rag_evaluation_results.json
 !README.md
 !AGENTS.md
 !CHANGELOG.md
+version_notes/
+
+# Frontend
+web/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
 
 # IDE internal
 .trae/

@@ -1,38 +1,37 @@
-"""聊天/会话路由"""
+"""Legacy API-key protected chat and session routes."""
 import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sse_starlette.sse import EventSourceResponse
+
+from api.dependencies import get_chat_service, verify_api_key
 from api.schemas import (
-    CreateSessionRequest, CreateSessionResponse,
-    SessionListResponse, SessionInfo,
+    ChatRequest,
+    ChatResponse,
+    CreateSessionRequest,
+    CreateSessionResponse,
     SessionDetailResponse,
-    ChatRequest, ChatResponse,
+    SessionInfo,
+    SessionListResponse,
 )
-from api.dependencies import verify_api_key, get_chat_service
-from services.chat_service import ChatService
-
-router = APIRouter(prefix="/api/v1", dependencies=[Depends(verify_api_key)])
 
 
-@router.post("/sessions", response_model=CreateSessionResponse)
-def create_session(req: CreateSessionRequest, service: ChatService = Depends(get_chat_service)):
-    """创建会话"""
-    session_id = service.create_session(req.user_id)
-    return CreateSessionResponse(session_id=session_id)
+router = APIRouter(prefix="/api/v1", dependencies=[Depends(verify_api_key)], tags=["legacy"])
 
 
-@router.get("/users/{user_id}/sessions", response_model=SessionListResponse)
-def list_user_sessions(user_id: str, service: ChatService = Depends(get_chat_service)):
-    """查询用户历史会话"""
+@router.post("/sessions", response_model=CreateSessionResponse, deprecated=True)
+def create_session(req: CreateSessionRequest, service=Depends(get_chat_service)):
+    return CreateSessionResponse(session_id=service.create_session(req.user_id))
+
+
+@router.get("/users/{user_id}/sessions", response_model=SessionListResponse, deprecated=True)
+def list_user_sessions(user_id: str, service=Depends(get_chat_service)):
     sessions = service.list_user_sessions(user_id)
-    return SessionListResponse(
-        sessions=[SessionInfo(**s) for s in sessions]
-    )
+    return SessionListResponse(sessions=[SessionInfo(**item) for item in sessions])
 
 
-@router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
-def get_session(session_id: str, service: ChatService = Depends(get_chat_service)):
-    """查询单个会话详情"""
+@router.get("/sessions/{session_id}", response_model=SessionDetailResponse, deprecated=True)
+def get_session(session_id: str, service=Depends(get_chat_service)):
     data = service.get_session(session_id)
     if not data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
@@ -43,23 +42,20 @@ def get_session(session_id: str, service: ChatService = Depends(get_chat_service
     )
 
 
-@router.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest, service: ChatService = Depends(get_chat_service)):
-    """非流式聊天"""
+@router.post("/chat", response_model=ChatResponse, deprecated=True)
+def chat(req: ChatRequest, service=Depends(get_chat_service)):
     answer = service.chat(req.user_id, req.session_id, req.message)
     return ChatResponse(session_id=req.session_id, answer=answer)
 
 
-@router.post("/chat/stream")
-async def chat_stream(req: ChatRequest, service: ChatService = Depends(get_chat_service)):
-    """SSE 流式聊天"""
-
+@router.post("/chat/stream", deprecated=True)
+async def chat_stream(req: ChatRequest, service=Depends(get_chat_service)):
     async def event_generator():
         try:
             for event_type, content in service.chat_stream(req.user_id, req.session_id, req.message):
                 yield {"event": event_type, "data": json.dumps({"content": content}, ensure_ascii=False)}
             yield {"event": "done", "data": json.dumps({"session_id": req.session_id}, ensure_ascii=False)}
-        except Exception as e:
-            yield {"event": "error", "data": json.dumps({"content": str(e)}, ensure_ascii=False)}
+        except Exception as exc:
+            yield {"event": "error", "data": json.dumps({"content": str(exc)}, ensure_ascii=False)}
 
     return EventSourceResponse(event_generator())

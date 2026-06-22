@@ -4,6 +4,47 @@
 
 ---
 
+## [v1.7] - 2026-06-22
+
+### Added
+
+- 新增 `services/auth_service.py`，使用 `HttpOnly` Cookie 管理浏览器登录态
+- 新增 SQLite `users` / `auth_sessions` 表
+- 新增 Vue3 前端工程 `web/`
+- 新增浏览器接口：
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/logout`
+  - `GET /api/v1/auth/me`
+  - `POST /api/v1/me/sessions`
+  - `GET /api/v1/me/sessions`
+  - `GET /api/v1/me/sessions/{session_id}`
+  - `POST /api/v1/me/chat/stream`
+  - `GET /api/v1/me/knowledge/chunks`
+  - `POST /api/v1/me/knowledge/documents/upload`
+  - `DELETE /api/v1/me/knowledge/chunks/{doc_id}`
+- 新增管理员接口：
+  - `GET /api/v1/admin/knowledge/chunks`
+  - `GET /api/v1/admin/knowledge/search`
+  - `POST /api/v1/admin/knowledge/documents/upload`
+  - `DELETE /api/v1/admin/knowledge/chunks/{doc_id}`
+  - `POST /api/v1/admin/knowledge/rebuild`
+- 新增后端鉴权回归测试 `tests/test_api_auth.py`
+- 新增前端单元测试与 Playwright 冒烟测试骨架
+
+### Changed
+
+- FastAPI 增加 CORS，允许配置化的 Vue3 源站并开启带凭证请求
+- 浏览器前端不再暴露 `FASTAPI_API_KEY`
+- 聊天、会话、私有知识的浏览器访问统一改为从登录态解析当前用户
+- 旧版 `/api/v1/*` API Key 路由标记为 deprecated
+- 主文档改为以 `Vue3 + FastAPI` 为默认运行方式，Streamlit 仅作为回退入口
+
+### Fixed
+
+- 修复前端升级后静态 API Key 会暴露到浏览器的问题
+- 修复普通用户可通过手工 `user_id` 切换访问其他用户会话/私有知识的风险
+- 修复本机代理 `127.0.0.1:7890` 劫持 DashScope HTTPS 请求导致 `SSLEOFError` 的问题，现会自动为 `dashscope.aliyuncs.com` 追加 `NO_PROXY`
+
 ## [v1.6] - 2026-06-22
 
 ### Added

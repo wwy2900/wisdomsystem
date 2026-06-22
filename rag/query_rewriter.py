@@ -3,7 +3,11 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_community.chat_models.tongyi import ChatTongyi
 from utils.logger_handler import logger
+from utils.network_env import ensure_no_proxy_hosts
 import re
+
+
+ensure_no_proxy_hosts()
 
 
 class QueryRewriter:

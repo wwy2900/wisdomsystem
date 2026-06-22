@@ -1,5 +1,5 @@
-"""FastAPI 请求/响应 Pydantic 模型"""
-from pydantic import BaseModel
+"""FastAPI request/response schemas."""
+from pydantic import BaseModel, Field
 
 
 class Message(BaseModel):
@@ -25,6 +25,10 @@ class SessionListResponse(BaseModel):
     sessions: list[SessionInfo]
 
 
+class MeSessionListResponse(BaseModel):
+    sessions: list[SessionInfo]
+
+
 class SessionDetailResponse(BaseModel):
     session_id: str
     user_id: str
@@ -37,15 +41,49 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class MeChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    session_id: str | None = None
+
+
 class ChatResponse(BaseModel):
     session_id: str
     answer: str
+
+
+class MeChatStreamEvent(BaseModel):
+    event: str
+    content: str | None = None
+    session_id: str | None = None
 
 
 class HealthResponse(BaseModel):
     status: str
     agent_ready: bool
     cache_backend: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class CurrentUserResponse(BaseModel):
+    id: str
+    username: str
+    role: str
+    display_name: str
+    is_active: bool
+
+
+class AuthSessionResponse(BaseModel):
+    authenticated: bool = True
+    user: CurrentUserResponse
+
+
+class OperationStatusResponse(BaseModel):
+    ok: bool = True
+    message: str = ""
 
 
 class KnowledgeUploadResponse(BaseModel):
@@ -71,8 +109,14 @@ class KnowledgeChunkListResponse(BaseModel):
     chunks: list[KnowledgeChunk]
 
 
+class AdminKnowledgeChunkListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    chunks: list[KnowledgeChunk]
+
+
 class UserChunkListResponse(BaseModel):
-    """某用户的私有 chunk 列表"""
     user_id: str
     total: int
     limit: int

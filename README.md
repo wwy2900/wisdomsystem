@@ -1,145 +1,65 @@
-# WisdomSystem - 智扫通智能客服
+# WisdomSystem
 
-基于 `LangChain + LangGraph + FastAPI + Streamlit` 的企业级智能客服项目。当前版本重点落在统一前后端架构、私有知识隔离、多格式知识入库、结构化 PDF 解析，以及知识库管理链路的稳定性重构。
+`WisdomSystem` 是一个面向智能客服场景的 RAG 系统，当前架构为：
 
----
+- `FastAPI` 作为唯一业务后端
+- `Vue 3 + Vite + TypeScript` 作为浏览器前端
+- `LangChain + LangGraph` 负责 Agent 推理
+- `ChromaDB + BM25 + Rerank` 负责检索
+- `SQLite + Redis/SimpleCache + JSON` 负责认证、会话和缓存
+
+旧版 `Streamlit` 前端仍保留在仓库中作为回退入口，但主流程已经切换为 `web/` 下的 Vue3 SPA。
 
 ## 核心能力
 
-### 1. 统一前后端架构
+- 聊天工作台：SSE 流式回答、工具过程展示、会话切换
+- 私有知识隔离：当前登录用户仅能访问自己的私有 chunk 和自己的会话
+- 管理员知识库：共享知识上传、chunk 分页查看、检索预览、按 `doc_id` 删除、索引重建
+- 多格式入库：`txt`、`pdf`、`docx`、`xlsx`、`csv`、`md`、`json`
+- PDF 结构化解析：`Docling + OcrAutoOptions`
 
-- Streamlit 仅作为前端客户端
-- FastAPI 作为唯一业务入口
-- 聊天通过 HTTP + SSE 调用后端
-- 知识库、会话、流式问答统一走 API
-
-### 2. RAG 检索链路
-
-- Query Rewrite
-- 向量检索 + BM25 混合召回
-- RRF 融合
-- Rerank 精排
-- 共享知识库 + 当前用户私有知识联合检索
-
-### 3. 私有知识库隔离
-
-- 上传、检索、删除、列表查询均支持 `user_id`
-- RAG 只允许命中共享知识和当前用户私有知识
-- 缓存按用户作用域隔离
-- 同内容文件允许不同用户分别建立私有知识
-
-### 4. 多格式文档解析与结构化入库
-
-当前支持：
-
-- `txt`
-- `pdf`
-- `docx`
-- `xlsx`
-- `csv`
-- `md`
-- `json`
-
-解析策略：
-
-- `csv/xlsx` 按行拆成结构化 `Document`
-- `json` 按顶层记录或键拆分
-- `md` 按标题层级拆分
-- `docx` 按节和表格线性提取
-- `pdf` 使用 Docling 输出“页内 section 文本块 + 独立 table 文档”
-
-### 5. PDF OCR 自动兜底
-
-- 使用 `Docling + OcrAutoOptions`
-- 仅对扫描页或大面积位图区域自动兜底
-- 不强制整页 OCR
-- 保留 `page / section_path / section_title / content_type / table_index`
-- OCR metadata 包含：
-  - `ocr_enabled`
-  - `ocr_mode=auto_fallback`
-  - `ocr_bitmap_area_threshold=0.05`
-
-### 6. 知识库稳定性改造
-
-- `doc_id` 改为稳定唯一 ID，不再依赖顺序号
-- MD5 记录改为结构化原子写入
-- 上传、删除、重建后自动失效 BM25 / RAG 缓存
-- chunk 分页和过滤改为底层分页查询，不再全量扫描后再切片
-
----
-
-## 当前版本重点
-
-### v1.6
-
-- 新增 `DocumentParserFactory`，统一 `txt/pdf/docx/xlsx/csv/md/json` 解析入口
-- PDF 解析升级为 Docling 结构化 Markdown + OCR 自动兜底
-- BM25 增加上传、删除、重建后的刷新机制
-- 知识库 chunk ID 升级为稳定唯一 ID
-- 知识库列表与删除链路改为分页查询和公开 API 访问
-- 补充依赖兼容说明与回归测试
-
-详细记录见 [CHANGELOG.md](CHANGELOG.md)。
-
----
-
-## 项目结构
+## 目录结构
 
 ```text
-WisdomSystem/
-├── agent/                  # ReAct Agent 与工具
-├── api/                    # FastAPI 入口与路由
-├── database/               # Redis / SQLite / 缓存封装
-├── frontend/               # Streamlit -> FastAPI 客户端
-├── memory/                 # 四层记忆与会话管理
-├── rag/                    # 检索、解析器、向量库、BM25
-├── services/               # 聊天与知识库服务
-├── data/                   # 数据文件与上传目录
-├── tests/                  # 测试与评估脚本
-├── DEPENDENCY_COMPATIBILITY.md
-├── AGENTS.md
-├── CHANGELOG.md
-└── app.py
+agent/                  ReAct Agent 与工具
+api/                    FastAPI 路由、鉴权、SSE
+database/               Redis / SQLite 封装
+memory/                 会话与长期记忆
+rag/                    解析器、检索、向量库
+services/               聊天、知识库、认证服务
+frontend/               旧版 Streamlit 客户端（兼容保留）
+web/                    新版 Vue3 前端
+tests/                  Python 回归测试
 ```
-
----
 
 ## 环境要求
 
 - Python 3.11
 - 推荐 Conda 环境：`wisdomsystem-py311`
+- Node.js 18+
 - 可选 Redis
 - DashScope API Key
 
----
-
-## 安装与启动
-
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/wwy2900/wisdomsystem.git
-cd wisdomsystem
-```
-
-### 2. 创建环境
+## 后端安装
 
 ```bash
 conda create -n wisdomsystem-py311 python=3.11
 conda activate wisdomsystem-py311
-```
-
-### 3. 安装依赖
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 4. 配置 `.env`
+## 前端安装
+
+```bash
+cd web
+npm install
+```
+
+## `.env` 示例
 
 ```env
-DASHSCOPE_API_KEY=your_api_key_here
-FASTAPI_API_KEY=your_fastapi_api_key
+DASHSCOPE_API_KEY=your_dashscope_api_key
+FASTAPI_API_KEY=legacy_fastapi_api_key
 
 REDIS_ENABLED=false
 REDIS_HOST=localhost
@@ -147,103 +67,124 @@ REDIS_PORT=6379
 REDIS_DB=0
 REDIS_CONNECT_TIMEOUT=1
 REDIS_SOCKET_TIMEOUT=1
+
+FRONTEND_ORIGINS=http://localhost:5173
+
+AUTH_SESSION_TTL_HOURS=24
+AUTH_SESSION_COOKIE_NAME=wisdomsystem_session
+AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_SAMESITE=lax
+
+AUTH_BOOTSTRAP_ADMIN_USERNAME=admin
+AUTH_BOOTSTRAP_ADMIN_PASSWORD=Admin12345!
+AUTH_BOOTSTRAP_ADMIN_DISPLAY_NAME=System Admin
+
+AUTH_BOOTSTRAP_USER_USERNAME=demo_user
+AUTH_BOOTSTRAP_USER_PASSWORD=User12345!
+AUTH_BOOTSTRAP_USER_DISPLAY_NAME=Demo User
 ```
 
-### 5. 启动服务
+说明：
 
-先启动 Redis（可选）：
+- 浏览器前端不再携带静态 `FASTAPI_API_KEY`
+- Vue3 前端通过 `HttpOnly` Cookie 使用 `/api/v1/auth/*` 与 `/api/v1/me/*`
+- DashScope 调用会自动为 `dashscope.aliyuncs.com` 与 `.aliyuncs.com` 追加 `NO_PROXY`，避免被本机代理错误接管
+- 旧版 `X-API-Key` 接口仍保留，但已标记为 deprecated
+
+## 启动方式
+
+### 1. 启动 Redis（可选）
 
 ```bash
 D:\Redis\redis-server.exe
 ```
 
-再启动 FastAPI：
+### 2. 启动 FastAPI
 
 ```bash
 conda activate wisdomsystem-py311
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-最后启动 Streamlit：
+接口文档：
+
+```text
+http://localhost:8000/docs
+```
+
+### 3. 启动 Vue3 前端
+
+```bash
+cd web
+npm run dev
+```
+
+页面地址：
+
+```text
+http://localhost:5173
+```
+
+### 4. 旧版 Streamlit 回退入口（可选）
 
 ```bash
 conda activate wisdomsystem-py311
 streamlit run app.py --server.port 8501
 ```
 
-访问地址：
-
-```text
-FastAPI Docs: http://localhost:8000/docs
-Streamlit:    http://localhost:8501
-```
-
----
-
 ## 主要接口
 
-### 聊天与会话
+### 浏览器鉴权
 
-- `GET /health`
-- `POST /api/v1/sessions`
-- `GET /api/v1/users/{user_id}/sessions`
-- `GET /api/v1/sessions/{session_id}`
-- `POST /api/v1/chat`
-- `POST /api/v1/chat/stream`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
 
-### 知识库管理
+### 用户自作用域接口
 
-- `POST /api/v1/knowledge/documents/upload`
-  - 支持 `txt/pdf/docx/xlsx/csv/md/json`
-- `GET /api/v1/knowledge/chunks`
-- `GET /api/v1/knowledge/search`
-- `GET /api/v1/knowledge/users/{user_id}/chunks`
-- `DELETE /api/v1/knowledge/chunks/{doc_id}`
-- `POST /api/v1/knowledge/rebuild`
+- `POST /api/v1/me/sessions`
+- `GET /api/v1/me/sessions`
+- `GET /api/v1/me/sessions/{session_id}`
+- `POST /api/v1/me/chat/stream`
+- `GET /api/v1/me/knowledge/chunks`
+- `POST /api/v1/me/knowledge/documents/upload`
+- `DELETE /api/v1/me/knowledge/chunks/{doc_id}`
 
----
+### 管理员接口
 
-## 常用验证命令
+- `GET /api/v1/admin/knowledge/chunks`
+- `GET /api/v1/admin/knowledge/search`
+- `POST /api/v1/admin/knowledge/documents/upload`
+- `DELETE /api/v1/admin/knowledge/chunks/{doc_id}`
+- `POST /api/v1/admin/knowledge/rebuild`
 
-语法检查：
+## 验证命令
 
 ```bash
 conda activate wisdomsystem-py311
 python -m compileall agent memory rag database utils model api services frontend app.py tests
-```
-
-解析器测试：
-
-```bash
-conda activate wisdomsystem-py311
 python -m unittest tests.test_document_parsers -v
 python -m unittest tests.test_rag_stability -v
-```
-
-依赖一致性：
-
-```bash
-conda activate wisdomsystem-py311
+python -m unittest tests.test_api_auth -v
 python -m pip check
 ```
 
-RAG 评估：
+前端：
 
 ```bash
-conda activate wisdomsystem-py311
-python tests/rag_evaluation.py
+cd web
+npm run build
+npm run test
+npx playwright test
 ```
 
----
+## 维护约束
 
-## 维护要点
-
-- Streamlit 前端只能通过 `frontend/api_client.py` 调用 FastAPI
-- 不要在前端直接导入 Agent、服务层或向量库
+- Vue 前端只能通过 HTTP/SSE 调 FastAPI，不直接导入 Python 业务代码
 - 私有知识改动必须保持严格用户隔离
-- 删除 chunk 只删向量库记录，不删除原始上传文件
-- 重建索引会清空当前向量库，执行前必须明确提示
-- OCR 当前保留 Auto fallback，不承诺强制语言控制
-- 依赖升级前先核对 [DEPENDENCY_COMPATIBILITY.md](DEPENDENCY_COMPATIBILITY.md)
+- 删除 chunk 只删除向量库记录，不删除原始上传文件
+- 重建索引前必须明确提示这是高风险操作
+- 旧版 Streamlit 只做兼容回退，不再承载新增功能
 
-更多维护信息见 [AGENTS.md](AGENTS.md)。
+- `version_notes/` 为本地长期复盘目录，默认不上传到 GitHub
+更多维护说明见 `AGENTS.md`。

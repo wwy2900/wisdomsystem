@@ -1,43 +1,82 @@
-"""FastAPI 应用入口"""
-# 必须在所有项目模块导入前加载环境变量
-from dotenv import load_dotenv
-load_dotenv()
-
+"""FastAPI application entrypoint."""
 from contextlib import asynccontextmanager
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+
+from api.routes.admin import router as admin_router
+from api.routes.auth import router as auth_router
 from api.routes.chat import router as chat_router
 from api.routes.knowledge import router as knowledge_router
+from api.routes.me import router as me_router
 from api.schemas import HealthResponse
-from services.chat_service import ChatService
-from services.knowledge_service import KnowledgeService
+from services.auth_service import AuthService
 from utils.logger_handler import logger
+
+
+load_dotenv()
+
+
+def _frontend_origins() -> list[str]:
+    raw_value = os.getenv("FRONTEND_ORIGINS", "http://localhost:5173")
+    return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
+def build_chat_service():
+    from services.chat_service import ChatService
+
+    return ChatService()
+
+
+def build_knowledge_service():
+    from services.knowledge_service import KnowledgeService
+
+    return KnowledgeService()
+
+
+def build_auth_service():
+    return AuthService()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动时初始化重型组件"""
-    logger.info("[FastAPI] 正在初始化服务...")
-    app.state.chat_service = ChatService()
-    app.state.knowledge_service = KnowledgeService()
-    logger.info("[FastAPI] 服务初始化完成")
+    logger.info("[FastAPI] initializing services")
+    app.state.chat_service = build_chat_service()
+    app.state.knowledge_service = build_knowledge_service()
+    app.state.auth_service = build_auth_service()
+    logger.info("[FastAPI] services ready")
     yield
-    logger.info("[FastAPI] 服务关闭")
+    logger.info("[FastAPI] shutdown")
 
 
-app = FastAPI(title="智扫通 API", description="智扫通智能客服 FastAPI 后端", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="WisdomSystem API",
+    description="WisdomSystem FastAPI backend",
+    version="1.7.0",
+    lifespan=lifespan,
+)
 
-# 健康检查（不鉴权）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_frontend_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 @app.get("/health", response_model=HealthResponse)
 def health(request: Request):
     chat_service = getattr(request.app.state, "chat_service", None)
     redis_cache = getattr(chat_service, "redis_cache", None)
     cache_backend = getattr(redis_cache, "backend", "unknown")
-    return HealthResponse(
-        status="ok",
-        agent_ready=chat_service is not None,
-        cache_backend=cache_backend,
-    )
+    return HealthResponse(status="ok", agent_ready=chat_service is not None, cache_backend=cache_backend)
 
-# 业务路由（鉴权）
+
+app.include_router(auth_router)
+app.include_router(me_router)
+app.include_router(admin_router)
 app.include_router(chat_router)
 app.include_router(knowledge_router)

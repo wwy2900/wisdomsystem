@@ -1,6 +1,10 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.chat_models.tongyi import ChatTongyi
+from utils.network_env import ensure_no_proxy_hosts
+
+
+ensure_no_proxy_hosts()
 
 
 class ContextualEnhancer:
