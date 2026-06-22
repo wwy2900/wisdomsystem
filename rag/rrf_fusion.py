@@ -1,6 +1,9 @@
 from langchain_core.documents import Document
 from typing import List
 
+from rag.document_identity import get_document_identity
+
+
 def rrf_fusion(
     vector_results: List[Document],
     bm25_results: List[Document],
@@ -10,13 +13,13 @@ def rrf_fusion(
     doc_scores = {}
 
     for rank, doc in enumerate(vector_results, 1):
-        doc_id = hash(doc.page_content)
+        doc_id = get_document_identity(doc)
         if doc_id not in doc_scores:
             doc_scores[doc_id] = {"doc": doc, "score": 0}
         doc_scores[doc_id]["score"] += 1 / (k + rank)
 
     for rank, doc in enumerate(bm25_results, 1):
-        doc_id = hash(doc.page_content)
+        doc_id = get_document_identity(doc)
         if doc_id not in doc_scores:
             doc_scores[doc_id] = {"doc": doc, "score": 0}
         doc_scores[doc_id]["score"] += 1 / (k + rank)

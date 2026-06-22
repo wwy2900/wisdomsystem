@@ -1,30 +1,34 @@
-from langchain_chroma import Chroma
-from langchain_core.documents import Document
-from utils.config_handler import chroma_conf
-
-from model.factory import embed_model
-
-from rag.question_splitter import QuestionBasedSplitter
-from utils.path_tool import get_abs_path
-from utils.file_handler import pdf_loader, txt_loader, listdir_with_allowed_type, get_file_md5_hex
-from utils.logger_handler import logger
-
+import hashlib
+import json
 import os
+import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+
+from model.factory import embed_model
+from rag.document_identity import get_document_identity
+from rag.document_parsers import DocumentParserFactory
+from rag.question_splitter import QuestionBasedSplitter
+from utils.config_handler import chroma_conf
+from utils.file_handler import get_file_md5_hex, listdir_with_allowed_type
+from utils.logger_handler import logger
+from utils.path_tool import get_abs_path
+
 
 class VectorStoreService:
+    _md5_store_lock = threading.Lock()
+
     def __init__(self):
         self.vector_store = Chroma(
             collection_name=chroma_conf["collection_name"],
             embedding_function=embed_model,
             persist_directory=chroma_conf["persist_directory"],
         )
-
-        # 使用按问题切分器
         self.spliter = QuestionBasedSplitter()
-
         self.batch_size = 10
 
     def get_retriever(self):
@@ -33,13 +37,16 @@ class VectorStoreService:
     def _get_md5_path(self) -> str:
         return get_abs_path(chroma_conf["md5_hex_store"])
 
+    def _empty_md5_store(self) -> dict:
+        return {"version": 1, "records": {}}
+
     def _ensure_md5_store(self):
         md5_path = self._get_md5_path()
         md5_dir = os.path.dirname(md5_path)
         if md5_dir:
             os.makedirs(md5_dir, exist_ok=True)
         if not os.path.exists(md5_path):
-            open(md5_path, "w", encoding="utf-8").close()
+            self._write_md5_store(self._empty_md5_store())
 
     def _md5_scope(self, user_id: str | None = None) -> str:
         return quote((user_id or "__shared__").strip() or "__shared__", safe="")
@@ -47,57 +54,154 @@ class VectorStoreService:
     def _md5_record(self, md5_hex: str, user_id: str | None = None) -> str:
         return f"{self._md5_scope(user_id)}:{md5_hex}"
 
-    def _check_file_exists(self, md5_for_check: str, user_id: str = "__shared__") -> bool:
+    def _read_md5_store(self) -> dict:
         self._ensure_md5_store()
-        expected_record = self._md5_record(md5_for_check, user_id)
-        with open(self._get_md5_path(), "r", encoding="utf-8") as f:
-            for line in f:
-                record = line.strip()
-                if record == expected_record:
-                    return True
-                # Compatibility with old md5.txt files that stored shared md5 values only.
-                if user_id == "__shared__" and record == md5_for_check:
-                    return True
-        return False
+        md5_path = self._get_md5_path()
+
+        with open(md5_path, "r", encoding="utf-8") as f:
+            raw_text = f.read().strip()
+
+        if not raw_text:
+            return self._empty_md5_store()
+
+        try:
+            payload = json.loads(raw_text)
+        except json.JSONDecodeError:
+            payload = None
+
+        if isinstance(payload, dict):
+            version = payload.get("version", 1)
+            raw_records = payload.get("records", payload)
+            records = {}
+            if isinstance(raw_records, dict):
+                for scope, md5_values in raw_records.items():
+                    if isinstance(md5_values, list):
+                        records[scope] = sorted({str(value) for value in md5_values if value})
+            return {"version": version, "records": records}
+
+        records = {}
+        for line in raw_text.splitlines():
+            record = line.strip()
+            if not record:
+                continue
+            if ":" in record:
+                scope, md5_hex = record.split(":", 1)
+            else:
+                scope, md5_hex = "__shared__", record
+            if md5_hex:
+                records.setdefault(scope, set()).add(md5_hex)
+
+        return {
+            "version": 1,
+            "records": {scope: sorted(values) for scope, values in records.items()},
+        }
+
+    def _write_md5_store(self, payload: dict):
+        md5_path = self._get_md5_path()
+        temp_path = f"{md5_path}.tmp"
+        normalized_payload = {
+            "version": payload.get("version", 1),
+            "records": {
+                scope: sorted({str(value) for value in values if value})
+                for scope, values in payload.get("records", {}).items()
+            },
+        }
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(normalized_payload, f, ensure_ascii=False, indent=2, sort_keys=True)
+        os.replace(temp_path, md5_path)
+
+    def _check_file_exists(self, md5_for_check: str, user_id: str = "__shared__") -> bool:
+        with self._md5_store_lock:
+            payload = self._read_md5_store()
+            scope = self._md5_scope(user_id)
+            return md5_for_check in set(payload["records"].get(scope, []))
 
     def _save_file_md5(self, md5_for_save: str, user_id: str = "__shared__"):
-        self._ensure_md5_store()
-        with open(self._get_md5_path(), "a", encoding="utf-8") as f:
-            f.write(self._md5_record(md5_for_save, user_id) + "\n")
+        with self._md5_store_lock:
+            payload = self._read_md5_store()
+            scope = self._md5_scope(user_id)
+            records = payload["records"].setdefault(scope, [])
+            if md5_for_save not in records:
+                records.append(md5_for_save)
+            self._write_md5_store(payload)
 
-    def _get_file_documents(self, read_path: str) -> list[Document]:
-        lower_path = read_path.lower()
-        if lower_path.endswith(".txt"):
-            return txt_loader(read_path)
+    @staticmethod
+    def _content_md5(text: str) -> str:
+        return hashlib.md5(text.encode("utf-8")).hexdigest()
 
-        if lower_path.endswith(".pdf"):
-            return pdf_loader(read_path)
+    def _build_chunk_id(self, doc: Document, chunk_index: int, user_id: str) -> str:
+        metadata = doc.metadata or {}
+        identity_payload = {
+            "user_id": user_id,
+            "file_md5": metadata.get("file_md5", ""),
+            "source_path": metadata.get("source_path") or metadata.get("source", ""),
+            "chunk_index": chunk_index,
+            "page": metadata.get("page"),
+            "section_path": metadata.get("section_path", ""),
+            "table_index": metadata.get("table_index"),
+            "content_type": metadata.get("content_type", ""),
+            "json_path": metadata.get("json_path", ""),
+            "record_index": metadata.get("record_index"),
+            "sheet_name": metadata.get("sheet_name", ""),
+            "row_index": metadata.get("row_index"),
+            "markdown_path": metadata.get("markdown_path", ""),
+            "content_md5": self._content_md5(doc.page_content),
+        }
+        encoded_identity = json.dumps(identity_payload, ensure_ascii=False, sort_keys=True)
+        return f"chunk_{uuid.uuid5(uuid.NAMESPACE_URL, encoded_identity).hex}"
 
-        return []
+    @staticmethod
+    def _build_where(user_id: str | None = None, doc_id: str | None = None) -> dict | None:
+        where = {}
+        if user_id is not None:
+            where["user_id"] = user_id
+        if doc_id is not None:
+            where["doc_id"] = doc_id
+        return where or None
+
+    @staticmethod
+    def _result_to_chunks(result: dict) -> list[dict]:
+        ids = result.get("ids") or []
+        documents = result.get("documents") or []
+        metadatas = result.get("metadatas") or []
+        chunks = []
+
+        for index, vector_id in enumerate(ids):
+            metadata = metadatas[index] if index < len(metadatas) and metadatas else {}
+            content = documents[index] if index < len(documents) and documents else ""
+            chunks.append(
+                {
+                    "vector_id": vector_id,
+                    "doc_id": metadata.get("doc_id", vector_id),
+                    "content": content,
+                    "metadata": metadata,
+                }
+            )
+        return chunks
+
+    def _count_where(self, where: dict | None = None) -> int:
+        return len(self.vector_store.get(where=where, include=[])["ids"])
+
+    def count_chunks(self, user_id: str | None = None) -> int:
+        return self._count_where(self._build_where(user_id=user_id))
 
     def _batch_add_documents(self, documents: list[Document], user_id: str = "__shared__") -> list[str]:
-        """分批添加文档，每批最多10个，为每个文档设置独立的 doc_id（序号格式）"""
         added_doc_ids = []
-        for i in range(0, len(documents), self.batch_size):
-            batch = documents[i:i+self.batch_size]
-            existing_count = len(self.vector_store.get()['ids'])
-            for idx, doc in enumerate(batch):
-                doc_id = f"chunk_{existing_count + idx + 1:04d}"
+        for start in range(0, len(documents), self.batch_size):
+            batch = documents[start:start + self.batch_size]
+            batch_ids = []
+            for chunk_index, doc in enumerate(batch, start=start):
+                doc_id = self._build_chunk_id(doc, chunk_index, user_id)
                 if not doc.metadata:
                     doc.metadata = {}
                 doc.metadata["doc_id"] = doc_id
                 doc.metadata["user_id"] = user_id
+                batch_ids.append(doc_id)
                 added_doc_ids.append(doc_id)
-            self.vector_store.add_documents(batch)
+            self.vector_store.add_documents(batch, ids=batch_ids)
         return added_doc_ids
 
     def add_file(self, file_path: str, user_id: str = "__shared__") -> dict:
-        """加载单个 txt/pdf 文件并写入向量库，使用 MD5 去重。
-
-        Args:
-            file_path: 文件路径
-            user_id: 归属用户，共享库为 \"__shared__\"
-        """
         allowed_types = tuple(f".{t.lstrip('.')}" for t in chroma_conf["allow_knowledge_file_type"])
         if not file_path.lower().endswith(allowed_types):
             return {
@@ -123,7 +227,7 @@ class VectorStoreService:
             }
 
         if self._check_file_exists(md5_hex, user_id=user_id):
-            logger.info(f"[加载知识库]{file_path}内容已经存在知识库内，跳过")
+            logger.info(f"[鍔犺浇鐭ヨ瘑搴揮]鍐呭宸茬粡瀛樺湪锛岃烦杩? {file_path}")
             return {
                 "file_path": file_path,
                 "file_name": os.path.basename(file_path),
@@ -134,9 +238,9 @@ class VectorStoreService:
                 "chunk_ids": [],
             }
 
-        documents = self._get_file_documents(file_path)
+        documents = DocumentParserFactory.parse(file_path)
         if not documents:
-            logger.warning(f"[加载知识库]{file_path}内没有有效文本内容，跳过")
+            logger.warning(f"[鍔犺浇鐭ヨ瘑搴揮]鏂囨。鏃犳湁鏁堝唴瀹癸紝璺宠繃: {file_path}")
             return {
                 "file_path": file_path,
                 "file_name": os.path.basename(file_path),
@@ -149,7 +253,7 @@ class VectorStoreService:
 
         split_documents = self.spliter.split_documents(documents)
         if not split_documents:
-            logger.warning(f"[加载知识库]{file_path}分片后没有有效文本内容，跳过")
+            logger.warning(f"[鍔犺浇鐭ヨ瘑搴揮]鍒嗙墖鍚庢棤鍐呭锛岃烦杩? {file_path}")
             return {
                 "file_path": file_path,
                 "file_name": os.path.basename(file_path),
@@ -169,7 +273,9 @@ class VectorStoreService:
 
         chunk_ids = self._batch_add_documents(split_documents, user_id=user_id)
         self._save_file_md5(md5_hex, user_id=user_id)
-        logger.info(f"[加载知识库]{file_path} 内容加载成功，共 {len(chunk_ids)} 个 chunk, user_id={user_id}")
+        logger.info(
+            f"[鍔犺浇鐭ヨ瘑搴揮]鍔犺浇鎴愬姛: {file_path}, chunks={len(chunk_ids)}, user_id={user_id}"
+        )
 
         return {
             "file_path": file_path,
@@ -182,13 +288,7 @@ class VectorStoreService:
         }
 
     def load_document(self):
-        """
-        从数据文件夹内读取数据文件，转为向量存入向量库
-        使用文件 MD5 做去重
-        :return: None
-        """
-
-        allowed_files_path: list[str] = listdir_with_allowed_type(
+        allowed_files_path = listdir_with_allowed_type(
             get_abs_path(chroma_conf["data_path"]),
             tuple(chroma_conf["allow_knowledge_file_type"]),
         )
@@ -197,163 +297,129 @@ class VectorStoreService:
             try:
                 self.add_file(path)
             except Exception as e:
-                logger.error(f"[加载知识库]{path}加载失败：{str(e)}", exc_info=True)
-                continue
+                logger.error(f"[鍔犺浇鐭ヨ瘑搴揮]鍔犺浇澶辫触: {path}, {str(e)}", exc_info=True)
 
     def get_all_documents_with_ids(self):
-        """获取所有文档及其 doc_id"""
-        docs = self.vector_store.get()
-        results = []
-        for i, id in enumerate(docs['ids']):
-            doc = Document(
-                page_content=docs['documents'][i],
-                metadata=docs['metadatas'][i] if docs['metadatas'] else {}
-            )
-            results.append({
-                "doc_id": doc.metadata.get("doc_id", id),
-                "content": doc.page_content,
-                "metadata": doc.metadata,
-            })
-        return results
+        return self.list_chunks(limit=self._count_where(), offset=0)["chunks"]
 
     def list_chunks(self, limit: int = 20, offset: int = 0, user_id: str | None = None) -> dict:
-        """分页获取向量库 chunk，可选按 user_id 过滤。"""
-        all_docs = self.get_all_documents_with_ids()
-        if user_id is not None:
-            all_docs = [d for d in all_docs if d.get("metadata", {}).get("user_id") == user_id]
-        total = len(all_docs)
         start = max(offset, 0)
-        end = start + max(limit, 0)
+        page_limit = max(limit, 0)
+        where = self._build_where(user_id=user_id)
+        total = self._count_where(where)
+        result = self.vector_store.get(
+            where=where,
+            limit=page_limit,
+            offset=start,
+            include=["metadatas", "documents"],
+        )
+        chunks = [
+            {
+                "doc_id": item["doc_id"],
+                "content": item["content"],
+                "metadata": item["metadata"],
+            }
+            for item in self._result_to_chunks(result)
+        ]
         return {
             "total": total,
             "limit": limit,
             "offset": offset,
-            "chunks": all_docs[start:end],
+            "chunks": chunks,
         }
 
     def search_chunks(self, query: str, k: int = 5, user_id: str | None = None) -> list[dict]:
-        """检索知识库 chunk，用于管理端预览命中结果。
-
-        Args:
-            user_id: 可选，传入时只检索共享库+该用户私有库
-        """
         if user_id:
             return self.search_user_knowledge(user_id, query, k)
 
         docs = self.vector_store.similarity_search(query, k=k)
-        results = []
-        for doc in docs:
-            metadata = doc.metadata or {}
-            results.append({
-                "doc_id": metadata.get("doc_id", ""),
+        return [
+            {
+                "doc_id": (doc.metadata or {}).get("doc_id", ""),
                 "content": doc.page_content,
-                "metadata": metadata,
-            })
-        return results
+                "metadata": doc.metadata or {},
+            }
+            for doc in docs
+        ]
 
     def retrieve_documents(self, query: str, k: int = 10, user_id: str | None = None) -> list[Document]:
-        """Retrieve shared documents plus the current user's private documents."""
         if user_id:
             return self.retrieve_user_documents(user_id, query, k)
         return self.vector_store.similarity_search(query, k=k, filter={"user_id": "__shared__"})
 
     def retrieve_user_documents(self, user_id: str, query: str, k: int = 10) -> list[Document]:
-        """Return shared + user-owned documents, never documents owned by other users."""
+        def search_shared():
+            return self.vector_store.similarity_search(query, k=k, filter={"user_id": "__shared__"})
 
-        def _search_shared():
-            return self.vector_store.similarity_search(
-                query, k=k, filter={"user_id": "__shared__"}
-            )
-
-        def _search_user():
-            return self.vector_store.similarity_search(
-                query, k=k, filter={"user_id": user_id}
-            )
+        def search_user():
+            return self.vector_store.similarity_search(query, k=k, filter={"user_id": user_id})
 
         with ThreadPoolExecutor(max_workers=2) as pool:
-            shared_docs = pool.submit(_search_shared)
-            user_docs = pool.submit(_search_user)
+            shared_docs = pool.submit(search_shared)
+            user_docs = pool.submit(search_user)
             docs = shared_docs.result() + user_docs.result()
 
-        seen_content = set()
+        seen = set()
         merged = []
         for doc in docs:
-            content_key = doc.page_content.strip()[:100]
-            if content_key in seen_content:
+            identity = get_document_identity(doc)
+            if identity in seen:
                 continue
-            seen_content.add(content_key)
+            seen.add(identity)
             merged.append(doc)
         return merged[:k]
 
     def search_user_knowledge(self, user_id: str, query: str, k: int = 5) -> list[dict]:
-        """检索共享知识库 + 用户私有知识库，合并去重返回。
-
-        Args:
-            user_id: 用户 ID
-            query: 检索查询
-            k: 返回结果数量
-        """
-        merged = []
-        for doc in self.retrieve_user_documents(user_id, query, k):
-            metadata = doc.metadata or {}
-            merged.append({
-                "doc_id": metadata.get("doc_id", ""),
+        return [
+            {
+                "doc_id": (doc.metadata or {}).get("doc_id", ""),
                 "content": doc.page_content,
-                "metadata": metadata,
-            })
-
-        return merged[:k]
+                "metadata": doc.metadata or {},
+            }
+            for doc in self.retrieve_user_documents(user_id, query, k)
+        ][:k]
 
     def list_user_chunks(self, user_id: str, limit: int = 100, offset: int = 0) -> dict:
-        """列出某用户的所有私有 chunk。"""
         return self.list_chunks(limit=limit, offset=offset, user_id=user_id)
 
-    def delete_document(self, doc_id: str, user_id: str | None = None):
-        """删除指定 doc_id 的向量库 chunk，不删除原始文件。
+    def get_chunk(self, doc_id: str, user_id: str | None = None) -> dict | None:
+        where = self._build_where(user_id=user_id, doc_id=doc_id)
+        result = self.vector_store.get(
+            where=where,
+            limit=1,
+            offset=0,
+            include=["metadatas", "documents"],
+        )
+        chunks = self._result_to_chunks(result)
+        return chunks[0] if chunks else None
 
-        Args:
-            doc_id: 要删除的 doc_id
-            user_id: 可选，传入时校验 chunk 归属
-        """
-        where = {"doc_id": doc_id}
-        if user_id:
-            where["user_id"] = user_id
-        self.vector_store._collection.delete(where=where)
-        logger.info(f"[向量库]已删除文档: {doc_id} (user_id={user_id or 'any'})")
+    def delete_document(self, doc_id: str, user_id: str | None = None) -> bool:
+        chunk = self.get_chunk(doc_id, user_id=user_id)
+        if not chunk:
+            logger.info(f"[鍚戦噺搴?]鏈壘鍒板緟鍒犻櫎 chunk: {doc_id}, user_id={user_id or 'any'}")
+            return False
+
+        self.vector_store.delete(ids=[chunk["vector_id"]])
+        logger.info(f"[鍚戦噺搴?]宸插垹闄? {doc_id} (user_id={user_id or 'any'})")
+        return True
 
     def clear_collection(self):
-        """清空向量库，用于重建"""
-        all_ids = self.vector_store.get()['ids']
+        all_ids = self.vector_store.get(include=[])["ids"]
         if all_ids:
-            self.vector_store._collection.delete(ids=all_ids)
-        # 清空 MD5 文件
-        md5_path = self._get_md5_path()
-        open(md5_path, "w", encoding="utf-8").close()
-        logger.info("[向量库]已清空所有文档和 MD5 记录")
+            self.vector_store.delete(ids=list(all_ids))
+        with self._md5_store_lock:
+            self._write_md5_store(self._empty_md5_store())
+        logger.info("[鍚戦噺搴?]宸叉竻绌烘枃妗ｅ拰 MD5 璁板綍")
 
     def _rebuild_md5_store(self):
-        """重新生成 MD5 记录文件（基于现有数据文件）"""
-        md5_path = get_abs_path(chroma_conf["md5_hex_store"])
         allowed_files = listdir_with_allowed_type(
             get_abs_path(chroma_conf["data_path"]),
-            tuple(chroma_conf["allow_knowledge_file_type"])
+            tuple(chroma_conf["allow_knowledge_file_type"]),
         )
-        with open(md5_path, "w", encoding="utf-8") as f:
-            for path in allowed_files:
-                md5_hex = get_file_md5_hex(path)
-                if md5_hex:
-                    f.write(self._md5_record(md5_hex, "__shared__") + "\n")
-
-
-if __name__ == '__main__':
-    vs = VectorStoreService()
-
-    vs.load_document()
-
-    retriever = vs.get_retriever()
-
-    res = retriever.invoke("迷路")
-    for r in res:
-        print(f"doc_id: {r.metadata.get('doc_id')}")
-        print(r.page_content)
-        print("-"*20)
+        payload = self._empty_md5_store()
+        for path in allowed_files:
+            md5_hex = get_file_md5_hex(path)
+            if md5_hex:
+                payload["records"].setdefault(self._md5_scope("__shared__"), []).append(md5_hex)
+        with self._md5_store_lock:
+            self._write_md5_store(payload)

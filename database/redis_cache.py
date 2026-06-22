@@ -26,6 +26,12 @@ class SimpleCache:
             return None
         return self.cache[key]
 
+    def delete(self, key: str):
+        existed = key in self.cache
+        self.cache.pop(key, None)
+        self.expiry.pop(key, None)
+        return 1 if existed else 0
+
     def expire(self, key: str, ttl: timedelta):
         if key in self.cache:
             self.expiry[key] = datetime.now() + ttl
@@ -239,3 +245,18 @@ class RedisCache:
 
     def get_cache(self, key: str) -> Optional[str]:
         return self.client.get(key)
+
+    def delete_cache_prefix(self, prefix: str) -> int:
+        if self.use_redis and hasattr(self.client, "scan_iter"):
+            keys = list(self.client.scan_iter(match=f"{prefix}*"))
+            if not keys:
+                return 0
+            return int(self.client.delete(*keys))
+
+        if hasattr(self.client, "cache"):
+            keys = [key for key in self.client.cache.keys() if key.startswith(prefix)]
+            for key in keys:
+                self.client.delete(key)
+            return len(keys)
+
+        return 0

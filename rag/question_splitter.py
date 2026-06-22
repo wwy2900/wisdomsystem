@@ -1,3 +1,4 @@
+import os
 import re
 from langchain_core.documents import Document
 from rag.contextual_enhancer import ContextualEnhancer
@@ -7,6 +8,7 @@ from utils.logger_handler import logger
 
 class QuestionBasedSplitter:
     """按问题切分文档，保证语义连贯性"""
+    structured_pdf_passthrough_chars = 2000
 
     def __init__(self):
         # 根据配置决定是否启用上下文增强（默认关闭，因为每个 chunk 调 LLM 加载慢）
@@ -114,8 +116,9 @@ class QuestionBasedSplitter:
         chunk_id = 1
 
         for doc in documents:
-            chunks = self.split_text(doc.page_content)
-            document_title = doc.metadata.get("source", "").split("\\")[-1].replace(".txt", "")
+            chunks = self._split_document_content(doc)
+            document_title = os.path.splitext(os.path.basename(doc.metadata.get("source", "")))[0]
+            base_metadata = dict(doc.metadata or {})
             
             for chunk_text in chunks:
                 # 根据配置决定是否启用上下文增强
@@ -124,13 +127,29 @@ class QuestionBasedSplitter:
                 else:
                     enhanced_content = chunk_text
                 
+                chunk_metadata = dict(base_metadata)
+                chunk_metadata["doc_id"] = f"chunk_{chunk_id:04d}"
+                chunk_metadata["source"] = base_metadata.get("source", "")
+
                 results.append(Document(
                     page_content=enhanced_content,
-                    metadata={
-                        "doc_id": f"chunk_{chunk_id:04d}",
-                        "source": doc.metadata.get("source", ""),
-                    }
+                    metadata=chunk_metadata
                 ))
                 chunk_id += 1
 
         return results
+
+    def _split_document_content(self, doc: Document) -> list[str]:
+        metadata = doc.metadata or {}
+        if metadata.get("file_type") == "pdf":
+            content_type = metadata.get("content_type")
+            if content_type == "table":
+                return [doc.page_content]
+            if content_type == "text" and metadata.get("page") is not None:
+                if len(doc.page_content) <= self.structured_pdf_passthrough_chars:
+                    return [doc.page_content]
+                return self._split_by_paragraph(
+                    doc.page_content,
+                    max_len=self.structured_pdf_passthrough_chars,
+                )
+        return self.split_text(doc.page_content)

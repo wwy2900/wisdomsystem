@@ -43,6 +43,7 @@ class KnowledgeService:
 
     def _iter_source_files(self) -> Iterable[tuple[str, str]]:
         allowed_types = tuple(chroma_conf["allow_knowledge_file_type"])
+        normalized_allowed_types = tuple(ext.lower() for ext in allowed_types)
         data_files = listdir_with_allowed_type(get_abs_path(chroma_conf["data_path"]), allowed_types)
         seen = set()
         for path in data_files:
@@ -56,7 +57,7 @@ class KnowledgeService:
             rel_dir = os.path.relpath(current_dir, self.upload_dir)
             user_id = "__shared__" if rel_dir == "." else unquote(rel_dir.split(os.sep, 1)[0])
             for filename in files:
-                if not filename.endswith(allowed_types):
+                if not filename.lower().endswith(normalized_allowed_types):
                     continue
                 path = os.path.join(current_dir, filename)
                 abs_path = os.path.abspath(path)
@@ -64,6 +65,15 @@ class KnowledgeService:
                     continue
                 seen.add(abs_path)
                 yield path, user_id
+
+    @staticmethod
+    def _should_invalidate(result: dict | None) -> bool:
+        return bool(result) and not result.get("skipped", False) and result.get("chunk_count", 0) > 0
+
+    def _invalidate_rag_state(self):
+        from rag.rag_service import RagSummarizeService
+
+        RagSummarizeService().invalidate_knowledge_state()
 
     def add_uploaded_document(self, filename: str, content: bytes, user_id: str = "__shared__") -> dict:
         safe_name = self._safe_filename(filename)
@@ -76,12 +86,17 @@ class KnowledgeService:
             f.write(content)
 
         result = self.vector_store.add_file(target_path, user_id=user_id)
+        if self._should_invalidate(result):
+            self._invalidate_rag_state()
         result["saved_path"] = target_path
         return result
 
     def add_document(self, file_path: str, user_id: str = "__shared__") -> dict:
         self._validate_extension(file_path)
-        return self.vector_store.add_file(file_path, user_id=user_id)
+        result = self.vector_store.add_file(file_path, user_id=user_id)
+        if self._should_invalidate(result):
+            self._invalidate_rag_state()
+        return result
 
     def list_chunks(self, limit: int = 20, offset: int = 0, user_id: str | None = None) -> dict:
         return self.vector_store.list_chunks(limit=limit, offset=offset, user_id=user_id)
@@ -93,12 +108,14 @@ class KnowledgeService:
         return self.vector_store.list_user_chunks(user_id, limit=limit, offset=offset)
 
     def delete_chunk(self, doc_id: str, user_id: str | None = None) -> dict:
-        before_total = self.vector_store.list_chunks(limit=1, offset=0)["total"]
-        self.vector_store.delete_document(doc_id, user_id=user_id)
-        after_total = self.vector_store.list_chunks(limit=1, offset=0)["total"]
+        before_total = self.vector_store.count_chunks(user_id=user_id)
+        deleted = self.vector_store.delete_document(doc_id, user_id=user_id)
+        after_total = before_total - 1 if deleted and before_total > 0 else before_total
+        if deleted:
+            self._invalidate_rag_state()
         return {
             "doc_id": doc_id,
-            "deleted": after_total < before_total,
+            "deleted": deleted,
             "before_total": before_total,
             "after_total": after_total,
         }
@@ -118,6 +135,8 @@ class KnowledgeService:
             if result.get("skipped"):
                 skipped_count += 1
             chunk_count += result.get("chunk_count", 0)
+
+        self._invalidate_rag_state()
 
         return {
             "file_count": file_count,

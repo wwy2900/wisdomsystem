@@ -22,7 +22,7 @@ async def upload_document(
     user_id: str = Query("__shared__"),
     service: KnowledgeService = Depends(get_knowledge_service),
 ):
-    """Upload a txt/pdf document and index it immediately."""
+    """Upload a txt/pdf/docx/xlsx/csv/md/json document and index it immediately."""
     try:
         content = await file.read()
         result = service.add_uploaded_document(file.filename or "knowledge", content, user_id=user_id)

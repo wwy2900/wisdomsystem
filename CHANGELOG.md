@@ -4,6 +4,54 @@
 
 ---
 
+## [v1.6] - 2026-06-22
+
+### Added
+
+- 新增 `rag/document_parsers/` 子模块与 `DocumentParserFactory`
+- 新增 `txt/pdf/docx/xlsx/csv/md/json` 统一解析入口
+- 新增结构化 metadata 字段：
+  - `file_type`
+  - `row_index`
+  - `sheet_name`
+  - `json_path`
+  - `record_index`
+  - `section_title`
+  - `section_path`
+  - `content_type`
+  - `table_index`
+  - `ocr_enabled`
+  - `ocr_mode`
+  - `ocr_bitmap_area_threshold`
+- 新增 `tests/test_document_parsers.py`
+- 新增 `tests/test_rag_stability.py`
+- 新增 `DEPENDENCY_COMPATIBILITY.md`
+
+### Changed
+
+- `VectorStoreService` 改为通过 `DocumentParserFactory` 分派文档解析
+- `BM25Retriever` 与向量入库共用同一套解析逻辑
+- PDF 解析从 `PyPDFLoader` 纯文本抽取升级为 `Docling` 结构化解析
+- PDF OCR 改为 `OcrAutoOptions` 自动兜底，仅依赖 Docling 的扫描页/位图区域判定
+- `QuestionBasedSplitter` 对结构化 PDF 增加边界保护：
+  - table 文档不再二次切分
+  - text 文档优先透传，超长时仅在页内块中切分
+- BM25 / RAG 在上传、删除、重建后自动失效并重载
+- chunk `doc_id` 从顺序号改为稳定唯一 ID
+- chunk 列表、过滤和删除链路改为底层分页查询和公开 API 路径
+- MD5 记录从裸文本升级为结构化原子写入
+- 混合检索去重从“前 100 字内容”升级为稳定文档身份键
+
+### Fixed
+
+- 修复 OCR Auto 模式下错误承诺“强制中英语言”的语义不一致问题
+- 修复 BM25 语料在上传、删除、重建后长期陈旧的问题
+- 修复删除后顺序 `doc_id` 复用和并发碰撞风险
+- 修复知识库管理列表和统计依赖全量扫描导致的扩展性问题
+- 修复 PDF 结构化 metadata 在后续 chunk 流程中丢失的风险
+
+---
+
 ## [v1.5] - 2026-06-21
 
 ### Added
