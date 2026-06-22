@@ -6,7 +6,7 @@
 
 ## 1. 系统架构
 
-项目当前为 `Vue3 + FastAPI` 主架构，旧版 `Streamlit` 仅作为兼容回退入口保留。
+项目当前为 `Vue3 + FastAPI` 主架构。
 
 | 层级 | 说明 | 关键文件 |
 | --- | --- | --- |
@@ -17,7 +17,6 @@
 | 记忆层 | 会话上下文、用户画像、会话摘要、长期经验 | `memory/` |
 | RAG 层 | 文档解析、向量检索、BM25、Rerank、私有知识隔离 | `rag/` |
 | 存储层 | Redis/SimpleCache、SQLite、ChromaDB、JSON 会话文件 | `database/`, `data/sessions/`, `chroma_db/` |
-| 兼容前端层 | 旧版 Streamlit 客户端，仅供回退验证 | `app.py`, `frontend/` |
 
 ---
 
@@ -162,7 +161,6 @@ http://localhost:8000/docs
 ## 4. 维护约束
 
 - 主前端为 Vue3，新增前端能力优先落在 `web/`
-- 旧版 `Streamlit` 只做兼容回退，不再承载新增功能
 - Vue 前端只能通过 `web/src/api/*` 调 FastAPI
 - 不要在前端直接导入 Agent、SessionManager、VectorStore 或服务层
 - 私有知识相关改动必须保持严格用户隔离
@@ -180,7 +178,7 @@ http://localhost:8000/docs
 若修改 RAG、会话或知识库边界逻辑，至少运行一次：
 
 ```bash
-python -m compileall agent memory rag database utils model api services frontend app.py tests
+python -m compileall agent memory rag database utils model api services tests
 ```
 
 推荐同时运行：
@@ -208,6 +206,23 @@ npx playwright test
 默认 Conda 环境：`wisdomsystem-py311`
 
 ### 启动顺序
+
+如果要走单机部署主路径，优先使用 Docker Compose：
+
+```bash
+docker version
+docker compose version
+docker compose up -d --build
+docker compose ps
+```
+
+默认访问地址：
+
+```text
+http://localhost:8080
+```
+
+Windows 上默认采用 `Docker Desktop + WSL2 backend`。Docker Desktop 程序本体可保持默认安装位置，但大体积镜像/卷数据应迁到 `D:\software\docker-desktop-data`。如果 Docker Desktop 启动异常，先检查 `wsl --version`、硬件虚拟化和 WSL 更新状态。
 
 1. Redis（可选）
 
@@ -237,20 +252,13 @@ FastAPI Docs: http://localhost:8000/docs
 Vue3:         http://localhost:5173
 ```
 
-4. Streamlit 回退入口（可选）
-
-```bash
-conda activate wisdomsystem-py311
-streamlit run app.py --server.port 8501
-```
-
 ### 常用检查
 
 语法检查：
 
 ```bash
 conda activate wisdomsystem-py311
-python -m compileall agent memory rag database utils model api services frontend app.py tests
+python -m compileall agent memory rag database utils model api services tests
 ```
 
 解析器、稳定性与鉴权测试：

@@ -14,7 +14,8 @@ from rag.document_identity import get_document_identity
 from rag.document_parsers import DocumentParserFactory
 from rag.question_splitter import QuestionBasedSplitter
 from utils.config_handler import chroma_conf
-from utils.file_handler import get_file_md5_hex, listdir_with_allowed_type
+from utils.file_handler import get_file_md5_hex
+from utils.knowledge_sources import iter_knowledge_source_files
 from utils.logger_handler import logger
 from utils.path_tool import get_abs_path
 
@@ -227,7 +228,7 @@ class VectorStoreService:
             }
 
         if self._check_file_exists(md5_hex, user_id=user_id):
-            logger.info(f"[鍔犺浇鐭ヨ瘑搴揮]鍐呭宸茬粡瀛樺湪锛岃烦杩? {file_path}")
+            logger.info(f"[加载知识库]内容已经存在，跳过: {file_path}")
             return {
                 "file_path": file_path,
                 "file_name": os.path.basename(file_path),
@@ -240,7 +241,7 @@ class VectorStoreService:
 
         documents = DocumentParserFactory.parse(file_path)
         if not documents:
-            logger.warning(f"[鍔犺浇鐭ヨ瘑搴揮]鏂囨。鏃犳湁鏁堝唴瀹癸紝璺宠繃: {file_path}")
+            logger.warning(f"[加载知识库]文档无有效内容，跳过: {file_path}")
             return {
                 "file_path": file_path,
                 "file_name": os.path.basename(file_path),
@@ -253,7 +254,7 @@ class VectorStoreService:
 
         split_documents = self.spliter.split_documents(documents)
         if not split_documents:
-            logger.warning(f"[鍔犺浇鐭ヨ瘑搴揮]鍒嗙墖鍚庢棤鍐呭锛岃烦杩? {file_path}")
+            logger.warning(f"[加载知识库]切片后无内容，跳过: {file_path}")
             return {
                 "file_path": file_path,
                 "file_name": os.path.basename(file_path),
@@ -274,7 +275,7 @@ class VectorStoreService:
         chunk_ids = self._batch_add_documents(split_documents, user_id=user_id)
         self._save_file_md5(md5_hex, user_id=user_id)
         logger.info(
-            f"[鍔犺浇鐭ヨ瘑搴揮]鍔犺浇鎴愬姛: {file_path}, chunks={len(chunk_ids)}, user_id={user_id}"
+            f"[加载知识库]加载成功: {file_path}, chunks={len(chunk_ids)}, user_id={user_id}"
         )
 
         return {
@@ -288,16 +289,11 @@ class VectorStoreService:
         }
 
     def load_document(self):
-        allowed_files_path = listdir_with_allowed_type(
-            get_abs_path(chroma_conf["data_path"]),
-            tuple(chroma_conf["allow_knowledge_file_type"]),
-        )
-
-        for path in allowed_files_path:
+        for path, user_id in iter_knowledge_source_files():
             try:
-                self.add_file(path)
+                self.add_file(path, user_id=user_id)
             except Exception as e:
-                logger.error(f"[鍔犺浇鐭ヨ瘑搴揮]鍔犺浇澶辫触: {path}, {str(e)}", exc_info=True)
+                logger.error(f"[加载知识库]加载失败: {path}, {str(e)}", exc_info=True)
 
     def get_all_documents_with_ids(self):
         return self.list_chunks(limit=self._count_where(), offset=0)["chunks"]
@@ -396,11 +392,11 @@ class VectorStoreService:
     def delete_document(self, doc_id: str, user_id: str | None = None) -> bool:
         chunk = self.get_chunk(doc_id, user_id=user_id)
         if not chunk:
-            logger.info(f"[鍚戦噺搴?]鏈壘鍒板緟鍒犻櫎 chunk: {doc_id}, user_id={user_id or 'any'}")
+            logger.info(f"[向量库]未找到待删除 chunk: {doc_id}, user_id={user_id or 'any'}")
             return False
 
         self.vector_store.delete(ids=[chunk["vector_id"]])
-        logger.info(f"[鍚戦噺搴?]宸插垹闄? {doc_id} (user_id={user_id or 'any'})")
+        logger.info(f"[向量库]已删除 {doc_id} (user_id={user_id or 'any'})")
         return True
 
     def clear_collection(self):
@@ -409,17 +405,13 @@ class VectorStoreService:
             self.vector_store.delete(ids=list(all_ids))
         with self._md5_store_lock:
             self._write_md5_store(self._empty_md5_store())
-        logger.info("[鍚戦噺搴?]宸叉竻绌烘枃妗ｅ拰 MD5 璁板綍")
+        logger.info("[向量库]已清空文档和 MD5 记录")
 
     def _rebuild_md5_store(self):
-        allowed_files = listdir_with_allowed_type(
-            get_abs_path(chroma_conf["data_path"]),
-            tuple(chroma_conf["allow_knowledge_file_type"]),
-        )
         payload = self._empty_md5_store()
-        for path in allowed_files:
+        for path, user_id in iter_knowledge_source_files():
             md5_hex = get_file_md5_hex(path)
             if md5_hex:
-                payload["records"].setdefault(self._md5_scope("__shared__"), []).append(md5_hex)
+                payload["records"].setdefault(self._md5_scope(user_id), []).append(md5_hex)
         with self._md5_store_lock:
             self._write_md5_store(payload)

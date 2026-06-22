@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from urllib.parse import quote
 from unittest.mock import Mock, patch
 
 os.environ.setdefault("DASHSCOPE_API_KEY", "test-key")
@@ -8,6 +9,7 @@ os.environ.setdefault("DASHSCOPE_API_KEY", "test-key")
 from langchain_core.documents import Document
 
 from rag.bm25_retriever import BM25Retriever
+from rag.rag_service import RagSummarizeService
 from rag.vector_store import VectorStoreService
 from services.knowledge_service import KnowledgeService
 from utils.config_handler import chroma_conf
@@ -46,7 +48,7 @@ class FakeVectorBackend:
 
 class RagStabilityTests(unittest.TestCase):
     def test_bm25_retriever_reload_refreshes_corpus(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir, tempfile.TemporaryDirectory() as upload_dir:
             first_path = os.path.join(temp_dir, "faq.md")
             second_path = os.path.join(temp_dir, "shipping.md")
             with open(first_path, "w", encoding="utf-8") as f:
@@ -57,16 +59,80 @@ class RagStabilityTests(unittest.TestCase):
                 {"data_path": temp_dir, "allow_knowledge_file_type": ["md"]},
                 clear=False,
             ):
-                retriever = BM25Retriever()
+                retriever = BM25Retriever(upload_dir=upload_dir)
+                retriever.retrieve("退货")
                 self.assertEqual(len(retriever.documents), 1)
 
                 with open(second_path, "w", encoding="utf-8") as f:
                     f.write("# Shipping\n48小时内发货\n")
 
                 retriever.reload()
+                retriever.retrieve("发货")
 
         self.assertEqual(len(retriever.documents), 2)
         self.assertEqual(len(retriever.corpus), 2)
+
+    def test_bm25_retriever_supports_user_scoped_private_knowledge(self):
+        with tempfile.TemporaryDirectory() as data_dir, tempfile.TemporaryDirectory() as upload_dir:
+            with open(os.path.join(data_dir, "shared.md"), "w", encoding="utf-8") as f:
+                f.write("# Shared\n共享退货政策\n")
+            with open(os.path.join(upload_dir, "shared-upload.md"), "w", encoding="utf-8") as f:
+                f.write("# Shared Upload\n共享运费说明\n")
+
+            user_one_dir = os.path.join(upload_dir, quote("user-1", safe=""))
+            user_two_dir = os.path.join(upload_dir, quote("user-2", safe=""))
+            os.makedirs(user_one_dir, exist_ok=True)
+            os.makedirs(user_two_dir, exist_ok=True)
+
+            with open(os.path.join(user_one_dir, "private-one.md"), "w", encoding="utf-8") as f:
+                f.write("# Private One\n用户一密码重置流程\n")
+            with open(os.path.join(user_two_dir, "private-two.md"), "w", encoding="utf-8") as f:
+                f.write("# Private Two\n用户二发票申请流程\n")
+
+            with patch.dict(
+                chroma_conf,
+                {"data_path": data_dir, "allow_knowledge_file_type": ["md"]},
+                clear=False,
+            ):
+                retriever = BM25Retriever(upload_dir=upload_dir)
+
+                shared_only = retriever.retrieve("密码重置")
+                self.assertEqual(shared_only, [])
+                self.assertEqual({doc.metadata["user_id"] for doc in retriever.documents}, {"__shared__"})
+
+                user_one_private = retriever.retrieve("密码重置", user_id="user-1")
+                self.assertEqual(len(user_one_private), 1)
+                self.assertEqual(user_one_private[0].metadata["user_id"], "user-1")
+                self.assertEqual(
+                    {doc.metadata["user_id"] for doc in retriever.documents},
+                    {"__shared__", "user-1"},
+                )
+
+                user_two_private = retriever.retrieve("密码重置", user_id="user-2")
+                self.assertEqual(user_two_private, [])
+                self.assertEqual(
+                    {doc.metadata["user_id"] for doc in retriever.documents},
+                    {"__shared__", "user-2"},
+                )
+
+                user_one_shared = retriever.retrieve("运费说明", user_id="user-1")
+                self.assertEqual(len(user_one_shared), 1)
+                self.assertEqual(user_one_shared[0].metadata["user_id"], "__shared__")
+
+    def test_hybrid_retrieval_single_passes_user_id_to_vector_and_bm25(self):
+        service = RagSummarizeService.__new__(RagSummarizeService)
+        vector_store = Mock()
+        bm25_retriever = Mock()
+        vector_store.retrieve_documents.return_value = [Document(page_content="vector", metadata={"doc_id": "v1"})]
+        bm25_retriever.retrieve.return_value = [Document(page_content="bm25", metadata={"doc_id": "b1"})]
+        service._get_vector_store = Mock(return_value=vector_store)
+        service._get_bm25_retriever = Mock(return_value=bm25_retriever)
+
+        docs = service._hybrid_retrieval_single("如何退货", user_id="user-1")
+
+        vector_store.retrieve_documents.assert_called_once_with("如何退货", 10, "user-1")
+        bm25_retriever.retrieve.assert_called_once_with("如何退货", 10, "user-1")
+        self.assertEqual(len(docs), 2)
 
     def test_vector_store_chunk_id_is_stable_and_non_sequential(self):
         service = VectorStoreService.__new__(VectorStoreService)
@@ -114,6 +180,52 @@ class RagStabilityTests(unittest.TestCase):
 
         self.assertTrue(deleted)
         self.assertEqual(backend.delete_calls, [{"ids": ["vector-2"]}])
+
+    def test_vector_store_load_document_uses_scoped_source_files(self):
+        service = VectorStoreService.__new__(VectorStoreService)
+        service.add_file = Mock()
+
+        with patch(
+            "rag.vector_store.iter_knowledge_source_files",
+            return_value=[
+                ("D:/data/shared.md", "__shared__"),
+                ("D:/data/knowledge_uploads/user-1/private.md", "user-1"),
+            ],
+        ):
+            service.load_document()
+
+        self.assertEqual(
+            service.add_file.call_args_list,
+            [
+                unittest.mock.call("D:/data/shared.md", user_id="__shared__"),
+                unittest.mock.call("D:/data/knowledge_uploads/user-1/private.md", user_id="user-1"),
+            ],
+        )
+
+    def test_vector_store_rebuild_md5_store_preserves_scope(self):
+        service = VectorStoreService.__new__(VectorStoreService)
+        captured = {}
+        service._write_md5_store = lambda payload: captured.setdefault("payload", payload)
+
+        with patch(
+            "rag.vector_store.iter_knowledge_source_files",
+            return_value=[
+                ("D:/data/shared.md", "__shared__"),
+                ("D:/data/knowledge_uploads/user-1/private.md", "user-1"),
+            ],
+        ), patch(
+            "rag.vector_store.get_file_md5_hex",
+            side_effect=["md5-shared", "md5-user-1"],
+        ):
+            service._rebuild_md5_store()
+
+        self.assertEqual(
+            captured["payload"]["records"],
+            {
+                service._md5_scope("__shared__"): ["md5-shared"],
+                service._md5_scope("user-1"): ["md5-user-1"],
+            },
+        )
 
     def test_knowledge_service_invalidates_rag_state_after_add_document(self):
         service = KnowledgeService.__new__(KnowledgeService)

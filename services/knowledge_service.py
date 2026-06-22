@@ -2,11 +2,11 @@
 import os
 import re
 from typing import Iterable
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 from rag.vector_store import VectorStoreService
 from utils.config_handler import chroma_conf
-from utils.file_handler import listdir_with_allowed_type
+from utils.knowledge_sources import iter_knowledge_source_files
 from utils.path_tool import get_abs_path
 from utils.logger_handler import logger
 
@@ -42,29 +42,11 @@ class KnowledgeService:
         return quote((user_id or "__shared__").strip() or "__shared__", safe="")
 
     def _iter_source_files(self) -> Iterable[tuple[str, str]]:
-        allowed_types = tuple(chroma_conf["allow_knowledge_file_type"])
-        normalized_allowed_types = tuple(ext.lower() for ext in allowed_types)
-        data_files = listdir_with_allowed_type(get_abs_path(chroma_conf["data_path"]), allowed_types)
-        seen = set()
-        for path in data_files:
-            abs_path = os.path.abspath(path)
-            if abs_path in seen:
-                continue
-            seen.add(abs_path)
-            yield path, "__shared__"
-
-        for current_dir, _, files in os.walk(self.upload_dir):
-            rel_dir = os.path.relpath(current_dir, self.upload_dir)
-            user_id = "__shared__" if rel_dir == "." else unquote(rel_dir.split(os.sep, 1)[0])
-            for filename in files:
-                if not filename.lower().endswith(normalized_allowed_types):
-                    continue
-                path = os.path.join(current_dir, filename)
-                abs_path = os.path.abspath(path)
-                if abs_path in seen:
-                    continue
-                seen.add(abs_path)
-                yield path, user_id
+        yield from iter_knowledge_source_files(
+            upload_dir=self.upload_dir,
+            data_path=chroma_conf["data_path"],
+            allowed_types=tuple(chroma_conf["allow_knowledge_file_type"]),
+        )
 
     @staticmethod
     def _should_invalidate(result: dict | None) -> bool:

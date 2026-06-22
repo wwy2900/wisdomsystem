@@ -16,9 +16,6 @@ langchain-text-splitters==0.3.2
 # Agent 编排
 langgraph==0.2.50
 
-# 前端
-streamlit==1.40.1
-
 # 文档处理
 pypdf==5.1.0
 pyyaml==6.0.2

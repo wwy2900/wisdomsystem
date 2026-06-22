@@ -323,6 +323,7 @@ class IntegrationShapeTests(unittest.TestCase):
                 clear=False,
             ):
                 retriever = BM25Retriever()
+                retriever.retrieve("退款")
 
         self.assertEqual(len(retriever.documents), 2)
         self.assertEqual(len(retriever.corpus), 2)

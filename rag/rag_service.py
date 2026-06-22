@@ -118,7 +118,7 @@ class RagSummarizeService:
                 10,
                 user_id,
             )
-            bm25_future = executor.submit(self._get_bm25_retriever().retrieve, query)
+            bm25_future = executor.submit(self._get_bm25_retriever().retrieve, query, 10, user_id)
             vector_docs = vector_future.result()
             bm25_docs = bm25_future.result()
         return rrf_fusion(vector_docs, bm25_docs)

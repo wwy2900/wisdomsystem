@@ -1,4 +1,4 @@
-"""Chat service shared by FastAPI and the legacy Streamlit client."""
+"""Chat service used by FastAPI routes."""
 from typing import Generator
 
 from agent.react_agent import ReactAgent
