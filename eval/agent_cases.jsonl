@@ -1,0 +1,15 @@
+{"id":"agent_001","category":"设备信息","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"我的设备保修到什么时候","expected_tool":"lookup_user_devices","expected_keywords":["保修","设备"],"note":"应查询当前用户绑定设备"}
+{"id":"agent_002","category":"设备信息","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"我绑定了哪些扫地机","expected_tool":"lookup_user_devices","expected_keywords":["设备","绑定"],"note":"应查询用户设备列表"}
+{"id":"agent_003","category":"设备信息","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"我的扫地机是什么型号","expected_tool":"lookup_user_devices","expected_keywords":["型号","设备"],"note":"应查询设备信息"}
+{"id":"agent_004","category":"耗材维护","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"边刷还有多久要换","expected_tool":"lookup_device_consumables","expected_keywords":["边刷","剩余"],"note":"应查询耗材状态"}
+{"id":"agent_005","category":"耗材维护","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"滤网该换了吗","expected_tool":"lookup_device_consumables","expected_keywords":["滤网","更换"],"note":"应查询耗材状态"}
+{"id":"agent_006","category":"耗材维护","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"滚刷寿命还剩多少","expected_tool":"lookup_device_consumables","expected_keywords":["滚刷","寿命"],"note":"应查询耗材状态"}
+{"id":"agent_007","category":"售后政策","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"怎么申请维修","expected_tool":"lookup_service_policy","expected_keywords":["维修","售后"],"note":"应查询售后政策"}
+{"id":"agent_008","category":"售后政策","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"保修期是多久","expected_tool":"lookup_service_policy","expected_keywords":["保修","期"],"note":"应查询售后政策"}
+{"id":"agent_009","category":"售后政策","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"退换货政策是什么","expected_tool":"lookup_service_policy","expected_keywords":["退换","政策"],"note":"应查询售后政策"}
+{"id":"agent_010","category":"服务渠道","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"客服电话是多少","expected_tool":"lookup_service_channels","expected_keywords":["电话","客服"],"note":"应查询服务渠道"}
+{"id":"agent_011","category":"服务渠道","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"怎么联系售后","expected_tool":"lookup_service_channels","expected_keywords":["联系","售后"],"note":"应查询服务渠道"}
+{"id":"agent_012","category":"服务渠道","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"有没有在线客服","expected_tool":"lookup_service_channels","expected_keywords":["在线","客服"],"note":"应查询服务渠道"}
+{"id":"agent_013","category":"知识库问答","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"扫地机器人首次使用怎么建图","expected_tool":"rag_summarize","expected_keywords":["首次","建图"],"note":"应走 RAG 工具"}
+{"id":"agent_014","category":"知识库问答","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"充电座怎么摆放","expected_tool":"rag_summarize","expected_keywords":["充电座","摆放"],"note":"应走 RAG 工具"}
+{"id":"agent_015","category":"知识库问答","user_id":"user_74bbef07baf54e0cba54d665a6cfa035","query":"怎么清理滤网","expected_tool":"rag_summarize","expected_keywords":["清理","滤网"],"note":"应走 RAG 工具"}

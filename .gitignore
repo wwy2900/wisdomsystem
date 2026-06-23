@@ -62,7 +62,12 @@ rag_evaluation_results.json
 !README.md
 !AGENTS.md
 !CHANGELOG.md
+!docs/evaluation_report.md
+!eval/README.md
 version_notes/
+
+# Evaluation reports (generated, keep only .gitkeep)
+eval/reports/*.json
 
 # Frontend
 web/node_modules/

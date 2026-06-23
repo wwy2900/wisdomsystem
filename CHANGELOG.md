@@ -1,6 +1,32 @@
-﻿# Changelog
+# Changelog
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本。
+
+---
+
+## [v1.9] - 2026-06-23
+
+### Added
+
+- 新增量化评测框架（`eval/` 目录），覆盖 RAG 检索、RAG 生成、Agent 工具选择、SSE 流式性能四类评测
+- 新增评测数据集：
+  - `eval/rag_cases.jsonl`（50 条，启发式预填 `expected_doc_ids`）
+  - `eval/agent_cases.jsonl`（15 条，覆盖 5 类工具）
+  - `eval/no_answer_cases.jsonl`（5 条，无答案场景）
+- 新增评测脚本：
+  - `eval/evaluate_retrieval.py`（Recall@K / MRR，支持 vector_only / bm25_only / hybrid_rerank 三种模式）
+  - `eval/evaluate_answer.py`（Keyword Coverage / Citation Rate / Answer Pass Rate / No-answer Accuracy）
+  - `eval/evaluate_agent.py`（Tool Selection Accuracy / First Tool Accuracy / Tool Success Rate / Source Rate）
+  - `eval/benchmark_stream.py`（TTFT / Total Latency / P50 / P95，支持 service 和 http 两种模式）
+- 新增评测工具：`eval/eval_utils.py`、`eval/migrate_test_cases.py`、`eval/export_chunks.py`、`eval/generate_markdown_report.py`
+- 新增量化评测报告 `docs/evaluation_report.md`
+- 新增版本复盘文档 `version_notes/v1.9_from_v1.8.md`
+
+### Changed
+
+- `.gitignore` 新增 `docs/evaluation_report.md` 和 `eval/README.md` 白名单
+- `.gitignore` 新增 `eval/reports/*.json` 忽略规则（保留 `.gitkeep`）
+- `AGENTS.md`、`README.md` 版本号同步更新到 v1.9
 
 ---
 

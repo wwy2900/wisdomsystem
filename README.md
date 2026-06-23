@@ -1,4 +1,4 @@
-﻿# WisdomSystem
+# WisdomSystem
 
 `WisdomSystem` 是一个面向智能客服场景的 RAG 系统，当前主架构为：
 - `FastAPI` 作为唯一业务后端
@@ -217,5 +217,5 @@ npx playwright test
 
 ## 当前版本
 
-- 当前仓库主线版本：`v1.8`
-- 版本重点：注册与管理员用户页、客服业务工具、答案来源展示、工具审计日志、Docker Compose 主部署路径
+- 当前仓库主线版本：`v1.9`
+- 版本重点：量化评测框架（RAG 检索/生成、Agent 工具、SSE 性能）、注册与管理员用户页、客服业务工具、答案来源展示、工具审计日志、Docker Compose 主部署路径

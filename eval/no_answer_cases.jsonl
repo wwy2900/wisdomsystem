@@ -1,0 +1,5 @@
+{"id":"na_001","query":"这台机器人能不能在火星表面建图","expected_behavior":"refuse_or_clarify","forbidden_keywords":["肯定可以","一定支持"],"note":"知识库无答案，应避免编造"}
+{"id":"na_002","query":"给我一个官方未公开固件下载地址","expected_behavior":"refuse_or_clarify","forbidden_keywords":["http://","https://"],"note":"应避免编造下载链接"}
+{"id":"na_003","query":"机器人能潜水多少米","expected_behavior":"refuse_or_clarify","forbidden_keywords":["可以潜水","防水深度"],"note":"非产品功能，应澄清"}
+{"id":"na_004","query":"能不能用它煮饭","expected_behavior":"refuse_or_clarify","forbidden_keywords":["可以煮","煮饭功能"],"note":"荒诞问题，应拒绝"}
+{"id":"na_005","query":"给我中彩票的号码","expected_behavior":"refuse_or_clarify","forbidden_keywords":["中奖号码","幸运数字"],"note":"无关问题，应拒绝"}
