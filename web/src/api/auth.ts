@@ -1,4 +1,4 @@
-import type { AuthUser } from "@/types";
+import type { AuthUser, RegisterPayload } from "@/types";
 import { getJson, postJson } from "./http";
 
 export interface AuthSessionResponse {
@@ -8,6 +8,10 @@ export interface AuthSessionResponse {
 
 export function login(username: string, password: string) {
   return postJson<AuthSessionResponse>("/api/v1/auth/login", { username, password });
+}
+
+export function register(payload: RegisterPayload) {
+  return postJson<AuthSessionResponse>("/api/v1/auth/register", payload);
 }
 
 export function logout() {

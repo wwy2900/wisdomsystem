@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { ElMessage } from "element-plus";
 
 import { useChatStore } from "@/stores/chat";
 import { useKnowledgeStore } from "@/stores/knowledge";
 import { useSessionStore } from "@/stores/session";
+import type { SourceReference } from "@/types";
 import { groupChunksBySourceFile } from "@/utils/groupChunks";
 
 const SUPPORTED_FILE_TYPES = "txt, pdf, docx, xlsx, csv, md, json";
@@ -36,6 +36,25 @@ function formatFileSize(size: number) {
 function resetSelectedFile() {
   selectedFile.value = null;
   uploadInputKey.value += 1;
+}
+
+function buildSourceMeta(source: SourceReference) {
+  if (source.source_type === "knowledge") {
+    const parts = [
+      source.metadata.source_file,
+      source.metadata.page ? `page ${source.metadata.page}` : "",
+      source.metadata.section_title || source.metadata.section_path || "",
+    ].filter(Boolean);
+    return parts.join(" | ");
+  }
+
+  const parts = [
+    source.metadata.channel_type,
+    source.metadata.category,
+    source.metadata.device_id,
+    source.metadata.service_hours,
+  ].filter(Boolean);
+  return parts.join(" | ");
 }
 
 async function bootstrap() {
@@ -157,6 +176,21 @@ onMounted(() => {
         <article v-for="(message, index) in chatStore.messages" :key="`${message.role}-${index}`" class="message-card">
           <header>{{ message.role === "assistant" ? "Assistant" : "User" }}</header>
           <p>{{ message.content }}</p>
+
+          <el-collapse v-if="message.role === 'assistant' && message.sources?.length" class="message-sources">
+            <el-collapse-item :title="`Sources (${message.sources.length})`" :name="`sources-${index}`">
+              <div class="source-list">
+                <article v-for="(source, sourceIndex) in message.sources" :key="`${index}-${sourceIndex}`" class="source-card">
+                  <div class="source-card-header">
+                    <strong>{{ source.title }}</strong>
+                    <span>{{ source.source_type === "knowledge" ? "Knowledge" : "Business Tool" }}</span>
+                  </div>
+                  <p>{{ source.snippet }}</p>
+                  <small v-if="buildSourceMeta(source)">{{ buildSourceMeta(source) }}</small>
+                </article>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
         </article>
 
         <article v-if="chatStore.streamingAssistantText" class="message-card assistant-stream">

@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes.admin import router as admin_router
+from api.routes.admin_users import router as admin_users_router
 from api.routes.auth import router as auth_router
 from api.routes.chat import router as chat_router
 from api.routes.knowledge import router as knowledge_router
@@ -78,5 +79,6 @@ def health(request: Request):
 app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(admin_router)
+app.include_router(admin_users_router)
 app.include_router(chat_router)
 app.include_router(knowledge_router)

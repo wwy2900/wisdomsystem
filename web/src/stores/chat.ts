@@ -2,7 +2,7 @@ import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { defineStore } from "pinia";
 
 import { getSession } from "@/api/chat";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, SourceReference } from "@/types";
 import { useSessionStore } from "./session";
 
 function normalizeErrorMessage(error: unknown) {
@@ -63,6 +63,7 @@ export const useChatStore = defineStore("chat", {
       let resolvedSessionId = sessionStore.currentSessionId || undefined;
       let completed = false;
       let failureHandled = false;
+      let resolvedSources: SourceReference[] = [];
 
       const handleFailure = (error: unknown) => {
         if (failureHandled) {
@@ -105,8 +106,13 @@ export const useChatStore = defineStore("chat", {
 
             if (event.event === "done") {
               completed = true;
+              resolvedSources = Array.isArray(payload.sources) ? payload.sources : [];
               if (this.streamingAssistantText.trim()) {
-                this.messages.push({ role: "assistant", content: this.streamingAssistantText });
+                this.messages.push({
+                  role: "assistant",
+                  content: this.streamingAssistantText,
+                  sources: resolvedSources,
+                });
               }
               this.streamingAssistantText = "";
               this.isStreaming = false;

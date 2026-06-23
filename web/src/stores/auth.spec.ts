@@ -19,6 +19,16 @@ vi.mock("@/api/auth", () => ({
       is_active: true,
     },
   }),
+  register: vi.fn().mockResolvedValue({
+    authenticated: true,
+    user: {
+      id: "user_2",
+      username: "new_user",
+      role: "user",
+      display_name: "New User",
+      is_active: true,
+    },
+  }),
   logout: vi.fn().mockResolvedValue({ ok: true, message: "Logged out" }),
 }));
 
@@ -39,5 +49,15 @@ describe("authStore", () => {
     const store = useAuthStore();
     await store.login("admin", "Admin12345!");
     expect(store.user?.role).toBe("admin");
+  });
+
+  it("updates the store after registration", async () => {
+    const store = useAuthStore();
+    await store.register({
+      username: "new_user",
+      display_name: "New User",
+      password: "Password123",
+    });
+    expect(store.user?.username).toBe("new_user");
   });
 });

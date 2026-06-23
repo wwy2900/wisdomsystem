@@ -1,0 +1,29 @@
+[
+  {
+    "record_id": "channel_hotline",
+    "title": "官方客服热线",
+    "channel_type": "phone",
+    "contact": "400-800-1234",
+    "service_hours": "09:00-21:00",
+    "address": "",
+    "keywords": ["电话", "热线", "人工客服", "咨询"]
+  },
+  {
+    "record_id": "channel_mail_in",
+    "title": "全国寄修中心",
+    "channel_type": "mail-in",
+    "contact": "service@example.com",
+    "service_hours": "工作日 09:00-18:00",
+    "address": "广东省深圳市南山区科技园售后收件中心",
+    "keywords": ["寄修", "邮寄", "返厂", "维修地址"]
+  },
+  {
+    "record_id": "channel_store",
+    "title": "授权服务门店",
+    "channel_type": "service_store",
+    "contact": "在线客服预约后获取最近门店",
+    "service_hours": "10:00-20:00",
+    "address": "支持按城市分配授权服务门店",
+    "keywords": ["门店", "网点", "上门", "送修", "城市"]
+  }
+]

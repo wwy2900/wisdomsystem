@@ -48,7 +48,18 @@ describe("chatStore", () => {
       });
       await options.onmessage({
         event: "done",
-        data: JSON.stringify({ session_id: "session_1" }),
+        data: JSON.stringify({
+          session_id: "session_1",
+          sources: [
+            {
+              source_type: "knowledge",
+              title: "faq.md",
+              snippet: "Hello there.",
+              tool_name: "rag_summarize",
+              metadata: { source_file: "faq.md" },
+            },
+          ],
+        }),
       });
     });
 
@@ -61,7 +72,19 @@ describe("chatStore", () => {
     expect(chatStore.toolEvents).toEqual(["retriever:start"]);
     expect(chatStore.messages).toEqual([
       { role: "user", content: "Need help" },
-      { role: "assistant", content: "Hello there." },
+      {
+        role: "assistant",
+        content: "Hello there.",
+        sources: [
+          {
+            source_type: "knowledge",
+            title: "faq.md",
+            snippet: "Hello there.",
+            tool_name: "rag_summarize",
+            metadata: { source_file: "faq.md" },
+          },
+        ],
+      },
     ]);
     expect(chatStore.lastFailedPrompt).toBe("");
     expect(chatStore.isStreaming).toBe(false);

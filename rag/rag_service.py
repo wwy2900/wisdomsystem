@@ -5,6 +5,7 @@ from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 
+from agent.tools.runtime import SourceReference
 from model.factory import chat_model
 from rag.bm25_retriever import BM25Retriever
 from rag.query_rewriter import QueryRewriter
@@ -99,7 +100,7 @@ class RagSummarizeService:
             try:
                 self._cache.delete_cache_prefix("rag:")
             except Exception as exc:
-                logger.warning(f"[RAG]缓存失效失败: {str(exc)}")
+                logger.warning(f"[RAG] failed to invalidate cache: {str(exc)}")
 
     def _local_cache_get(self, key: str):
         return self._local_cache.get(key)
@@ -138,7 +139,7 @@ class RagSummarizeService:
                     docs = future.result()
                     all_docs.extend(docs)
                 except Exception as exc:
-                    logger.error(f"[RAG]多路召回失败: {str(exc)}")
+                    logger.error(f"[RAG] multi-query retrieval failed: {str(exc)}")
 
         if not all_docs:
             return []
@@ -158,30 +159,60 @@ class RagSummarizeService:
         fused_docs = self._hybrid_retrieval_multi(queries_to_retrieve, user_id=user_id)
         return self._get_reranker().rerank(query, fused_docs)
 
+    @staticmethod
+    def build_source_references(documents: list[Document], limit: int = 3) -> list[SourceReference]:
+        sources: list[SourceReference] = []
+        for doc in documents[:limit]:
+            metadata = doc.metadata or {}
+            title = metadata.get("source_file") or metadata.get("source_path") or metadata.get("source") or "Knowledge"
+            sources.append(
+                SourceReference(
+                    source_type="knowledge",
+                    title=str(title),
+                    snippet=doc.page_content[:220].strip(),
+                    tool_name="rag_summarize",
+                    doc_id=str(metadata.get("doc_id", "")) or None,
+                    metadata={
+                        "user_id": metadata.get("user_id"),
+                        "source_file": metadata.get("source_file"),
+                        "source_path": metadata.get("source_path") or metadata.get("source"),
+                        "page": metadata.get("page"),
+                        "section_title": metadata.get("section_title"),
+                        "section_path": metadata.get("section_path"),
+                    },
+                )
+            )
+        return sources
+
     def rag_summarize(self, query: str, user_id: str | None = None) -> str:
+        result, _sources = self.rag_summarize_with_sources(query, user_id=user_id)
+        return result
+
+    def rag_summarize_with_sources(self, query: str, user_id: str | None = None) -> tuple[str, list[SourceReference]]:
         scope = user_id or "__shared__"
         query_hash = hashlib.md5(query.encode()).hexdigest()
         scope_hash = hashlib.md5(scope.encode()).hexdigest()
         cache_key = f"rag:{scope_hash}:{query_hash}"
+        context_docs = self.retriever_docs(query, user_id=user_id)
+        sources = self.build_source_references(context_docs)
 
         local_result = self._local_cache_get(cache_key)
         if local_result is not None:
-            logger.debug(f"[RAG]命中本地缓存: {query[:30]}")
-            return local_result
+            logger.debug(f"[RAG] hit local cache: {query[:30]}")
+            return local_result, sources
 
         try:
             redis_result = self._get_cache().get_cache(cache_key)
             if redis_result:
-                logger.debug(f"[RAG]命中 Redis 缓存: {query[:30]}")
+                logger.debug(f"[RAG] hit Redis cache: {query[:30]}")
                 self._local_cache_set(cache_key, redis_result)
-                return redis_result
+                return redis_result, sources
         except Exception as exc:
-            logger.warning(f"[RAG]Redis 缓存读取失败: {str(exc)}")
+            logger.warning(f"[RAG] failed to read Redis cache: {str(exc)}")
 
-        context_docs = self.retriever_docs(query, user_id=user_id)
         context = ""
         for index, doc in enumerate(context_docs, start=1):
-            context += f"【参考资料{index}】 {doc.page_content}\n"
+            context += f"[Reference {index}] {doc.page_content}\n"
 
         result = self.chain.invoke(
             {
@@ -194,6 +225,6 @@ class RagSummarizeService:
         try:
             self._get_cache().set_cache(cache_key, result, ttl_seconds=86400)
         except Exception as exc:
-            logger.warning(f"[RAG]Redis 缓存写入失败: {str(exc)}")
+            logger.warning(f"[RAG] failed to write Redis cache: {str(exc)}")
 
-        return result
+        return result, sources

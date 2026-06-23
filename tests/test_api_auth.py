@@ -60,10 +60,22 @@ class FakeChatService:
             },
         )
         session["messages"].append({"role": "user", "content": message})
-        yield ("tool_event", "[TOOL]mock_lookup")
-        yield ("answer_delta", "reply-1 ")
-        yield ("answer_delta", "reply-2")
-        session["messages"].append({"role": "assistant", "content": "reply-1 reply-2"})
+        sources = [
+            {
+                "source_type": "knowledge",
+                "title": "faq.md",
+                "snippet": "reply source",
+                "tool_name": "rag_summarize",
+                "doc_id": "doc_1",
+                "record_id": None,
+                "metadata": {"source_file": "faq.md", "page": 1},
+            }
+        ]
+        yield ("tool_event", {"content": "[TOOL]mock_lookup"})
+        yield ("answer_delta", {"content": "reply-1 "})
+        yield ("answer_delta", {"content": "reply-2"})
+        session["messages"].append({"role": "assistant", "content": "reply-1 reply-2", "sources": sources})
+        yield ("_done", {"sources": sources})
 
 
 class FakeKnowledgeService:
@@ -163,6 +175,36 @@ class ApiAuthTests(unittest.TestCase):
             self.assertEqual(me_response.status_code, 200)
             self.assertEqual(me_response.json()["username"], "demo_user")
 
+    def test_register_creates_user_and_restores_cookie_session(self):
+        with self.make_client() as client:
+            response = client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "alice",
+                    "password": "Password123",
+                    "display_name": "Alice",
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("set-cookie", response.headers)
+            self.assertEqual(response.json()["user"]["role"], "user")
+
+            me_response = client.get("/api/v1/auth/me")
+            self.assertEqual(me_response.status_code, 200)
+            self.assertEqual(me_response.json()["username"], "alice")
+
+    def test_register_rejects_duplicate_username(self):
+        with self.make_client() as client:
+            response = client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "demo_user",
+                    "password": "Password123",
+                    "display_name": "Duplicate",
+                },
+            )
+            self.assertEqual(response.status_code, 409)
+
     def test_requires_auth_for_me_routes(self):
         with self.make_client() as client:
             response = client.get("/api/v1/me/sessions")
@@ -180,6 +222,36 @@ class ApiAuthTests(unittest.TestCase):
             response = client.get("/api/v1/admin/knowledge/chunks")
             self.assertEqual(response.status_code, 200)
             self.assertIn("chunks", response.json())
+
+    def test_user_cannot_access_admin_user_routes(self):
+        with self.make_client() as client:
+            self.login(client, "demo_user", "User12345!")
+            response = client.get("/api/v1/admin/users")
+            self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_list_and_create_users(self):
+        with self.make_client() as client:
+            self.login(client, "admin", "Admin12345!")
+
+            list_response = client.get("/api/v1/admin/users")
+            self.assertEqual(list_response.status_code, 200)
+            self.assertGreaterEqual(len(list_response.json()["users"]), 2)
+
+            create_response = client.post(
+                "/api/v1/admin/users",
+                json={
+                    "username": "operator",
+                    "password": "Password123",
+                    "display_name": "Operator",
+                    "role": "admin",
+                },
+            )
+            self.assertEqual(create_response.status_code, 200)
+            self.assertEqual(create_response.json()["role"], "admin")
+
+            refreshed = client.get("/api/v1/admin/users")
+            usernames = [item["username"] for item in refreshed.json()["users"]]
+            self.assertIn("operator", usernames)
 
     def test_user_cannot_read_other_users_session(self):
         with self.make_client() as client:
@@ -217,6 +289,22 @@ class ApiAuthTests(unittest.TestCase):
             self.assertIn("event: tool_event", body)
             self.assertIn("event: answer_delta", body)
             self.assertIn("event: done", body)
+            self.assertIn('"sources":', body)
+
+    def test_session_detail_returns_assistant_sources(self):
+        with self.make_client() as client:
+            self.login(client, "demo_user", "User12345!")
+            create_response = client.post("/api/v1/me/sessions")
+            session_id = create_response.json()["session_id"]
+            with client.stream("POST", "/api/v1/me/chat/stream", json={"message": "hello", "session_id": session_id}) as response:
+                _ = "".join(chunk.decode("utf-8") for chunk in response.iter_bytes())
+            self.assertEqual(response.status_code, 200)
+
+            detail_response = client.get(f"/api/v1/me/sessions/{session_id}")
+            self.assertEqual(detail_response.status_code, 200)
+            assistant_messages = [item for item in detail_response.json()["messages"] if item["role"] == "assistant"]
+            self.assertEqual(len(assistant_messages), 1)
+            self.assertEqual(assistant_messages[0]["sources"][0]["title"], "faq.md")
 
 
 if __name__ == "__main__":

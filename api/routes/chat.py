@@ -52,9 +52,13 @@ def chat(req: ChatRequest, service=Depends(get_chat_service)):
 async def chat_stream(req: ChatRequest, service=Depends(get_chat_service)):
     async def event_generator():
         try:
-            for event_type, content in service.chat_stream(req.user_id, req.session_id, req.message):
-                yield {"event": event_type, "data": json.dumps({"content": content}, ensure_ascii=False)}
-            yield {"event": "done", "data": json.dumps({"session_id": req.session_id}, ensure_ascii=False)}
+            done_payload = {"session_id": req.session_id, "sources": []}
+            for event_type, payload in service.chat_stream(req.user_id, req.session_id, req.message):
+                if event_type == "_done":
+                    done_payload["sources"] = payload.get("sources", [])
+                    continue
+                yield {"event": event_type, "data": json.dumps(payload, ensure_ascii=False)}
+            yield {"event": "done", "data": json.dumps(done_payload, ensure_ascii=False)}
         except Exception as exc:
             yield {"event": "error", "data": json.dumps({"content": str(exc)}, ensure_ascii=False)}
 

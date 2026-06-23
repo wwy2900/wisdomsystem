@@ -1,25 +1,63 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
 
 import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
 const router = useRouter();
-const form = reactive({
+
+const activeTab = ref<"login" | "register">("login");
+const loading = ref(false);
+
+const loginForm = reactive({
   username: "demo_user",
   password: "User12345!",
 });
-const loading = ref(false);
 
-async function submit() {
+const registerForm = reactive({
+  username: "",
+  display_name: "",
+  password: "",
+  confirmPassword: "",
+});
+
+function resetRegisterForm() {
+  registerForm.username = "";
+  registerForm.display_name = "";
+  registerForm.password = "";
+  registerForm.confirmPassword = "";
+}
+
+async function submitLogin() {
   loading.value = true;
   try {
-    const user = await authStore.login(form.username, form.password);
+    const user = await authStore.login(loginForm.username, loginForm.password);
     router.push(user.role === "admin" ? "/admin/knowledge" : "/chat");
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "登录失败");
+    ElMessage.error(error instanceof Error ? error.message : "Login failed.");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function submitRegister() {
+  if (registerForm.password !== registerForm.confirmPassword) {
+    ElMessage.error("Passwords do not match.");
+    return;
+  }
+
+  loading.value = true;
+  try {
+    await authStore.register({
+      username: registerForm.username,
+      display_name: registerForm.display_name,
+      password: registerForm.password,
+    });
+    resetRegisterForm();
+    router.push("/chat");
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "Registration failed.");
   } finally {
     loading.value = false;
   }
@@ -30,21 +68,67 @@ async function submit() {
   <section class="login-page">
     <div class="login-panel">
       <p class="hero-kicker">Browser Frontend</p>
-      <h1 data-testid="login-title">智扫通 Vue3 前端</h1>
+      <h1 data-testid="login-title">WisdomSystem Workspace</h1>
       <p class="hero-copy">
-        使用 FastAPI 的会话 Cookie 登录，区分普通用户与管理员工作流。默认引导账号可在后端
-        `AUTH_BOOTSTRAP_*` 环境变量中替换。
+        Sign in with an existing account or register a new user account. Admin accounts remain restricted to admin
+        creation and bootstrap setup.
       </p>
 
-      <el-form label-position="top" @submit.prevent="submit">
-        <el-form-item label="用户名">
-          <el-input v-model="form.username" placeholder="请输入用户名" />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input v-model="form.password" show-password type="password" placeholder="请输入密码" />
-        </el-form-item>
-        <el-button class="login-button" :loading="loading" type="primary" @click="submit">登录</el-button>
-      </el-form>
+      <el-tabs v-model="activeTab" stretch>
+        <el-tab-pane label="Login" name="login">
+          <el-form label-position="top" @submit.prevent="submitLogin">
+            <el-form-item label="Username">
+              <el-input v-model="loginForm.username" autocomplete="username" placeholder="Enter your username" />
+            </el-form-item>
+            <el-form-item label="Password">
+              <el-input
+                v-model="loginForm.password"
+                autocomplete="current-password"
+                placeholder="Enter your password"
+                show-password
+                type="password"
+              />
+            </el-form-item>
+            <el-button class="login-button" :loading="loading" type="primary" @click="submitLogin">Login</el-button>
+          </el-form>
+        </el-tab-pane>
+
+        <el-tab-pane label="Register" name="register">
+          <el-form label-position="top" @submit.prevent="submitRegister">
+            <el-form-item label="Username">
+              <el-input v-model="registerForm.username" autocomplete="username" placeholder="Choose a username" />
+            </el-form-item>
+            <el-form-item label="Display name">
+              <el-input
+                v-model="registerForm.display_name"
+                autocomplete="name"
+                placeholder="Enter the name shown in the app"
+              />
+            </el-form-item>
+            <el-form-item label="Password">
+              <el-input
+                v-model="registerForm.password"
+                autocomplete="new-password"
+                placeholder="At least 8 characters"
+                show-password
+                type="password"
+              />
+            </el-form-item>
+            <el-form-item label="Confirm password">
+              <el-input
+                v-model="registerForm.confirmPassword"
+                autocomplete="new-password"
+                placeholder="Re-enter your password"
+                show-password
+                type="password"
+              />
+            </el-form-item>
+            <el-button class="login-button" :loading="loading" type="primary" @click="submitRegister">
+              Create account
+            </el-button>
+          </el-form>
+        </el-tab-pane>
+      </el-tabs>
     </div>
   </section>
 </template>

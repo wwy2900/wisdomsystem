@@ -2,9 +2,20 @@
 from pydantic import BaseModel, Field
 
 
+class SourceReferenceResponse(BaseModel):
+    source_type: str
+    title: str
+    snippet: str
+    tool_name: str
+    doc_id: str | None = None
+    record_id: str | None = None
+    metadata: dict = Field(default_factory=dict)
+
+
 class Message(BaseModel):
     role: str
     content: str
+    sources: list[SourceReferenceResponse] | None = None
 
 
 class CreateSessionRequest(BaseModel):
@@ -55,6 +66,7 @@ class MeChatStreamEvent(BaseModel):
     event: str
     content: str | None = None
     session_id: str | None = None
+    sources: list[SourceReferenceResponse] | None = None
 
 
 class HealthResponse(BaseModel):
@@ -64,8 +76,14 @@ class HealthResponse(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=8)
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=8)
+    display_name: str = Field(..., min_length=1)
 
 
 class CurrentUserResponse(BaseModel):
@@ -79,6 +97,26 @@ class CurrentUserResponse(BaseModel):
 class AuthSessionResponse(BaseModel):
     authenticated: bool = True
     user: CurrentUserResponse
+
+
+class CreateUserRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=8)
+    display_name: str = Field(..., min_length=1)
+    role: str = Field(..., pattern="^(user|admin)$")
+
+
+class UserSummary(BaseModel):
+    id: str
+    username: str
+    role: str
+    display_name: str
+    is_active: bool
+    created_at: str
+
+
+class UserListResponse(BaseModel):
+    users: list[UserSummary]
 
 
 class OperationStatusResponse(BaseModel):

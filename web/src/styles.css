@@ -228,6 +228,36 @@ textarea {
   white-space: pre-wrap;
 }
 
+.message-sources {
+  margin-top: 0.85rem;
+}
+
+.source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.source-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.75rem 0.85rem;
+  background: rgba(244, 246, 251, 0.92);
+}
+
+.source-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+
+.source-card-header span,
+.source-card small {
+  color: var(--text-muted);
+}
+
 .assistant-stream {
   border-style: dashed;
 }

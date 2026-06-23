@@ -9,11 +9,24 @@ from api.schemas import (
     CurrentUserResponse,
     LoginRequest,
     OperationStatusResponse,
+    RegisterRequest,
 )
-from services.auth_service import AuthError, AuthService
+from services.auth_service import AuthError, AuthService, UserConflictError, UserValidationError
 
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+
+def _set_session_cookie(response: Response, auth_service: AuthService, session_id: str):
+    response.set_cookie(
+        key=auth_service.cookie_name,
+        value=session_id,
+        httponly=True,
+        secure=auth_service.cookie_secure,
+        samesite=auth_service.cookie_samesite,
+        max_age=auth_service.session_ttl_hours * 3600,
+        path="/",
+    )
 
 
 @router.post("/login", response_model=AuthSessionResponse)
@@ -27,15 +40,24 @@ def login(
     except AuthError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
-    response.set_cookie(
-        key=auth_service.cookie_name,
-        value=session_id,
-        httponly=True,
-        secure=auth_service.cookie_secure,
-        samesite=auth_service.cookie_samesite,
-        max_age=auth_service.session_ttl_hours * 3600,
-        path="/",
-    )
+    _set_session_cookie(response, auth_service, session_id)
+    return AuthSessionResponse(user=CurrentUserResponse(**user))
+
+
+@router.post("/register", response_model=AuthSessionResponse)
+def register(
+    req: RegisterRequest,
+    response: Response,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    try:
+        session_id, user = auth_service.register_user(req.username, req.password, req.display_name)
+    except UserConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except UserValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    _set_session_cookie(response, auth_service, session_id)
     return AuthSessionResponse(user=CurrentUserResponse(**user))
 
 

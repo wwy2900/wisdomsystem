@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 
 import * as authApi from "@/api/auth";
-import type { AuthUser } from "@/types";
+import type { AuthUser, RegisterPayload } from "@/types";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -28,6 +28,11 @@ export const useAuthStore = defineStore("auth", {
     },
     async login(username: string, password: string) {
       const response = await authApi.login(username, password);
+      this.user = response.user;
+      return response.user;
+    },
+    async register(payload: RegisterPayload) {
+      const response = await authApi.register(payload);
       this.user = response.user;
       return response.user;
     },

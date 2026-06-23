@@ -8,15 +8,45 @@ export interface AuthUser {
   is_active: boolean;
 }
 
+export interface RegisterPayload {
+  username: string;
+  password: string;
+  display_name: string;
+}
+
+export interface AdminCreateUserPayload extends RegisterPayload {
+  role: UserRole;
+}
+
+export interface UserSummary {
+  id: string;
+  username: string;
+  role: UserRole;
+  display_name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface SessionSummary {
   session_id: string;
   preview: string;
   saved_at: string;
 }
 
+export interface SourceReference {
+  source_type: "knowledge" | "business_tool";
+  title: string;
+  snippet: string;
+  tool_name: string;
+  doc_id?: string | null;
+  record_id?: string | null;
+  metadata: Record<string, unknown>;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
+  sources?: SourceReference[];
 }
 
 export interface SessionDetail {
@@ -29,6 +59,7 @@ export interface ChatStreamEvent {
   event: string;
   content?: string;
   session_id?: string;
+  sources?: SourceReference[];
 }
 
 export interface KnowledgeChunk {

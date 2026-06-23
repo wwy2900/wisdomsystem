@@ -15,6 +15,14 @@ class AuthError(Exception):
     """Raised when authentication fails."""
 
 
+class UserConflictError(Exception):
+    """Raised when a user cannot be created because of a uniqueness conflict."""
+
+
+class UserValidationError(Exception):
+    """Raised when submitted user data is invalid."""
+
+
 class AuthService:
     def __init__(self, db: SQLiteDatabase | None = None):
         self.db = db or SQLiteDatabase()
@@ -85,18 +93,81 @@ class AuthService:
             "is_active": bool(user.get("is_active", True)),
         }
 
-    def login(self, username: str, password: str) -> tuple[str, dict[str, Any]]:
-        self.db.delete_expired_auth_sessions()
-        user = self.db.get_user_by_username(username)
-        if not user or not bool(user.get("is_active")):
-            raise AuthError("Invalid username or password")
-        if not self._verify_password(password, user["password_hash"]):
-            raise AuthError("Invalid username or password")
+    @staticmethod
+    def _user_summary(user: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": user["id"],
+            "username": user["username"],
+            "role": user["role"],
+            "display_name": user.get("display_name") or user["username"],
+            "is_active": bool(user.get("is_active", True)),
+            "created_at": user["created_at"],
+        }
 
+    @staticmethod
+    def _normalize_username(username: str) -> str:
+        return username.strip()
+
+    @staticmethod
+    def _normalize_display_name(display_name: str) -> str:
+        return display_name.strip()
+
+    @staticmethod
+    def _validate_password(password: str):
+        if len(password) < 8:
+            raise UserValidationError("Password must be at least 8 characters long")
+
+    def _create_session_for_user(self, user: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         session_id = f"auth_{secrets.token_urlsafe(24)}"
         expires_at = (datetime.now() + timedelta(hours=self.session_ttl_hours)).isoformat()
         self.db.save_auth_session(session_id, user["id"], expires_at)
         return session_id, self._public_user(user)
+
+    def create_user(self, username: str, password: str, display_name: str, role: str = "user") -> dict[str, Any]:
+        normalized_username = self._normalize_username(username)
+        normalized_display_name = self._normalize_display_name(display_name)
+
+        if not normalized_username:
+            raise UserValidationError("Username is required")
+        if not normalized_display_name:
+            raise UserValidationError("Display name is required")
+        if role not in {"user", "admin"}:
+            raise UserValidationError("Unsupported user role")
+
+        self._validate_password(password)
+
+        if self.db.get_user_by_username(normalized_username):
+            raise UserConflictError("Username already exists")
+
+        user = self.db.create_user(
+            user_id=f"user_{uuid4().hex}",
+            username=normalized_username,
+            password_hash=self._hash_password(password),
+            role=role,
+            display_name=normalized_display_name,
+            is_active=True,
+        )
+        return self._user_summary(user)
+
+    def register_user(self, username: str, password: str, display_name: str) -> tuple[str, dict[str, Any]]:
+        self.db.delete_expired_auth_sessions()
+        self.create_user(username=username, password=password, display_name=display_name, role="user")
+        user = self.db.get_user_by_username(self._normalize_username(username))
+        if not user:
+            raise UserValidationError("User registration failed")
+        return self._create_session_for_user(user)
+
+    def list_users(self) -> list[dict[str, Any]]:
+        return [self._user_summary(user) for user in self.db.list_users()]
+
+    def login(self, username: str, password: str) -> tuple[str, dict[str, Any]]:
+        self.db.delete_expired_auth_sessions()
+        user = self.db.get_user_by_username(self._normalize_username(username))
+        if not user or not bool(user.get("is_active")):
+            raise AuthError("Invalid username or password")
+        if not self._verify_password(password, user["password_hash"]):
+            raise AuthError("Invalid username or password")
+        return self._create_session_for_user(user)
 
     def logout(self, session_id: str | None):
         if not session_id:

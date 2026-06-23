@@ -94,6 +94,54 @@ class SQLiteDatabase:
                 )
             ''')
 
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS customer_devices (
+                    device_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    product_name TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    serial_number TEXT,
+                    status TEXT NOT NULL,
+                    purchase_date TEXT,
+                    warranty_expires_at TEXT,
+                    is_default INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            ''')
+
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS device_consumables (
+                    id TEXT PRIMARY KEY,
+                    device_id TEXT NOT NULL,
+                    consumable_type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    remaining_percent INTEGER,
+                    remaining_days INTEGER,
+                    maintenance_tip TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (device_id) REFERENCES customer_devices(device_id)
+                )
+            ''')
+
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS tool_audit_logs (
+                    id TEXT PRIMARY KEY,
+                    request_id TEXT,
+                    session_id TEXT,
+                    user_id TEXT,
+                    tool_name TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    args_summary TEXT,
+                    result_summary TEXT,
+                    error_summary TEXT,
+                    duration_ms INTEGER,
+                    created_at TEXT NOT NULL
+                )
+            ''')
+
             conn.commit()
 
     def _row_to_user(self, row) -> Optional[Dict[str, Any]]:
@@ -108,6 +156,58 @@ class SQLiteDatabase:
             'is_active': bool(row[5]),
             'created_at': row[6],
             'updated_at': row[7],
+        }
+
+    @staticmethod
+    def _row_to_customer_device(row) -> Optional[Dict[str, Any]]:
+        if not row:
+            return None
+        return {
+            'device_id': row[0],
+            'user_id': row[1],
+            'product_name': row[2],
+            'model': row[3],
+            'serial_number': row[4],
+            'status': row[5],
+            'purchase_date': row[6],
+            'warranty_expires_at': row[7],
+            'is_default': bool(row[8]),
+            'created_at': row[9],
+            'updated_at': row[10],
+        }
+
+    @staticmethod
+    def _row_to_device_consumable(row) -> Optional[Dict[str, Any]]:
+        if not row:
+            return None
+        return {
+            'id': row[0],
+            'device_id': row[1],
+            'consumable_type': row[2],
+            'status': row[3],
+            'remaining_percent': row[4],
+            'remaining_days': row[5],
+            'maintenance_tip': row[6],
+            'created_at': row[7],
+            'updated_at': row[8],
+        }
+
+    @staticmethod
+    def _row_to_tool_audit_log(row) -> Optional[Dict[str, Any]]:
+        if not row:
+            return None
+        return {
+            'id': row[0],
+            'request_id': row[1],
+            'session_id': row[2],
+            'user_id': row[3],
+            'tool_name': row[4],
+            'status': row[5],
+            'args_summary': row[6],
+            'result_summary': row[7],
+            'error_summary': row[8],
+            'duration_ms': row[9],
+            'created_at': row[10],
         }
 
     def save_user_profile(self, user_id: str, data: Dict[str, Any]):
@@ -237,6 +337,16 @@ class SQLiteDatabase:
             ''', (user_id,))
             return self._row_to_user(cursor.fetchone())
 
+    def list_users(self) -> List[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, username, password_hash, role, display_name, is_active, created_at, updated_at
+                FROM users
+                ORDER BY created_at DESC, username ASC
+            ''')
+            return [self._row_to_user(row) for row in cursor.fetchall()]
+
     def save_auth_session(self, session_id: str, user_id: str, expires_at: str) -> Dict[str, Any]:
         created_at = datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
@@ -279,3 +389,179 @@ class SQLiteDatabase:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM auth_sessions WHERE expires_at <= ?', (cutoff,))
             conn.commit()
+
+    def upsert_customer_device(
+        self,
+        device_id: str,
+        user_id: str,
+        product_name: str,
+        model: str,
+        serial_number: str | None,
+        status: str,
+        purchase_date: str | None,
+        warranty_expires_at: str | None,
+        is_default: bool = False,
+    ) -> Dict[str, Any]:
+        now = datetime.now().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if is_default:
+                cursor.execute('UPDATE customer_devices SET is_default = 0, updated_at = ? WHERE user_id = ?', (now, user_id))
+            cursor.execute('''
+                INSERT OR REPLACE INTO customer_devices
+                (device_id, user_id, product_name, model, serial_number, status, purchase_date, warranty_expires_at, is_default, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM customer_devices WHERE device_id = ?), ?), ?)
+            ''', (
+                device_id,
+                user_id,
+                product_name,
+                model,
+                serial_number,
+                status,
+                purchase_date,
+                warranty_expires_at,
+                1 if is_default else 0,
+                device_id,
+                now,
+                now,
+            ))
+            conn.commit()
+        return self.get_customer_device(device_id=device_id, user_id=user_id)
+
+    def list_customer_devices(self, user_id: str) -> List[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT device_id, user_id, product_name, model, serial_number, status, purchase_date, warranty_expires_at, is_default, created_at, updated_at
+                FROM customer_devices
+                WHERE user_id = ?
+                ORDER BY is_default DESC, created_at ASC, device_id ASC
+            ''', (user_id,))
+            return [self._row_to_customer_device(row) for row in cursor.fetchall()]
+
+    def get_customer_device(self, device_id: str, user_id: str | None = None) -> Optional[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if user_id is None:
+                cursor.execute('''
+                    SELECT device_id, user_id, product_name, model, serial_number, status, purchase_date, warranty_expires_at, is_default, created_at, updated_at
+                    FROM customer_devices
+                    WHERE device_id = ?
+                ''', (device_id,))
+            else:
+                cursor.execute('''
+                    SELECT device_id, user_id, product_name, model, serial_number, status, purchase_date, warranty_expires_at, is_default, created_at, updated_at
+                    FROM customer_devices
+                    WHERE device_id = ? AND user_id = ?
+                ''', (device_id, user_id))
+            return self._row_to_customer_device(cursor.fetchone())
+
+    def upsert_device_consumable(
+        self,
+        record_id: str,
+        device_id: str,
+        consumable_type: str,
+        status: str,
+        remaining_percent: int | None,
+        remaining_days: int | None,
+        maintenance_tip: str | None,
+    ) -> Dict[str, Any]:
+        now = datetime.now().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO device_consumables
+                (id, device_id, consumable_type, status, remaining_percent, remaining_days, maintenance_tip, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM device_consumables WHERE id = ?), ?), ?)
+            ''', (
+                record_id,
+                device_id,
+                consumable_type,
+                status,
+                remaining_percent,
+                remaining_days,
+                maintenance_tip,
+                record_id,
+                now,
+                now,
+            ))
+            conn.commit()
+        return self.get_device_consumable(record_id)
+
+    def get_device_consumable(self, record_id: str) -> Optional[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, device_id, consumable_type, status, remaining_percent, remaining_days, maintenance_tip, created_at, updated_at
+                FROM device_consumables
+                WHERE id = ?
+            ''', (record_id,))
+            return self._row_to_device_consumable(cursor.fetchone())
+
+    def list_device_consumables(self, device_id: str) -> List[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, device_id, consumable_type, status, remaining_percent, remaining_days, maintenance_tip, created_at, updated_at
+                FROM device_consumables
+                WHERE device_id = ?
+                ORDER BY consumable_type ASC, created_at ASC
+            ''', (device_id,))
+            return [self._row_to_device_consumable(row) for row in cursor.fetchall()]
+
+    def create_tool_audit_log(
+        self,
+        log_id: str,
+        request_id: str | None,
+        session_id: str | None,
+        user_id: str | None,
+        tool_name: str,
+        status: str,
+        args_summary: str | None = None,
+        result_summary: str | None = None,
+        error_summary: str | None = None,
+        duration_ms: int | None = None,
+    ) -> Dict[str, Any]:
+        created_at = datetime.now().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO tool_audit_logs
+                (id, request_id, session_id, user_id, tool_name, status, args_summary, result_summary, error_summary, duration_ms, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                log_id,
+                request_id,
+                session_id,
+                user_id,
+                tool_name,
+                status,
+                args_summary,
+                result_summary,
+                error_summary,
+                duration_ms,
+                created_at,
+            ))
+            conn.commit()
+        return self.get_tool_audit_log(log_id)
+
+    def get_tool_audit_log(self, log_id: str) -> Optional[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, request_id, session_id, user_id, tool_name, status, args_summary, result_summary, error_summary, duration_ms, created_at
+                FROM tool_audit_logs
+                WHERE id = ?
+            ''', (log_id,))
+            return self._row_to_tool_audit_log(cursor.fetchone())
+
+    def list_tool_audit_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, request_id, session_id, user_id, tool_name, status, args_summary, result_summary, error_summary, duration_ms, created_at
+                FROM tool_audit_logs
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (limit,))
+            return [self._row_to_tool_audit_log(row) for row in cursor.fetchall()]

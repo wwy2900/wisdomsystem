@@ -1,0 +1,30 @@
+[
+  {
+    "record_id": "policy_warranty_standard",
+    "category": "warranty",
+    "title": "整机保修规则",
+    "content": "整机默认保修 24 个月，电池与易损耗材按产品说明书执行单独保修周期。保修期以购买凭证日期为准。",
+    "keywords": ["保修", "质保", "整机", "电池", "期限"]
+  },
+  {
+    "record_id": "policy_return_exchange",
+    "category": "returns",
+    "title": "退换货受理条件",
+    "content": "签收后 7 天内可按平台规则申请退货；15 天内出现非人为质量问题可申请换货。包装、附件和购买凭证需尽量完整保留。",
+    "keywords": ["退货", "换货", "7天", "15天", "质量问题"]
+  },
+  {
+    "record_id": "policy_repair_process",
+    "category": "repair",
+    "title": "维修受理流程",
+    "content": "维修前需准备设备 SN、故障描述和购买凭证。寄修前建议先完成远程排障；确认寄修后按客服提供的地址和工单信息寄送设备。",
+    "keywords": ["维修", "寄修", "故障", "SN", "购买凭证"]
+  },
+  {
+    "record_id": "policy_accessories",
+    "category": "accessories",
+    "title": "配件购买建议",
+    "content": "主刷、边刷、滤网、拖布等耗材建议通过官方商城、授权门店或客服推荐渠道购买，避免非原装配件影响清洁效果或保修认定。",
+    "keywords": ["配件", "耗材", "主刷", "滤网", "拖布", "购买"]
+  }
+]

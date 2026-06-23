@@ -52,7 +52,7 @@ class RagStabilityTests(unittest.TestCase):
             first_path = os.path.join(temp_dir, "faq.md")
             second_path = os.path.join(temp_dir, "shipping.md")
             with open(first_path, "w", encoding="utf-8") as f:
-                f.write("# FAQ\n支持退货\n")
+                f.write("# FAQ\nSupports returns.\n")
 
             with patch.dict(
                 chroma_conf,
@@ -60,14 +60,14 @@ class RagStabilityTests(unittest.TestCase):
                 clear=False,
             ):
                 retriever = BM25Retriever(upload_dir=upload_dir)
-                retriever.retrieve("退货")
+                retriever.retrieve("returns")
                 self.assertEqual(len(retriever.documents), 1)
 
                 with open(second_path, "w", encoding="utf-8") as f:
-                    f.write("# Shipping\n48小时内发货\n")
+                    f.write("# Shipping\nShips within 48 hours.\n")
 
                 retriever.reload()
-                retriever.retrieve("发货")
+                retriever.retrieve("shipping")
 
         self.assertEqual(len(retriever.documents), 2)
         self.assertEqual(len(retriever.corpus), 2)
@@ -75,9 +75,9 @@ class RagStabilityTests(unittest.TestCase):
     def test_bm25_retriever_supports_user_scoped_private_knowledge(self):
         with tempfile.TemporaryDirectory() as data_dir, tempfile.TemporaryDirectory() as upload_dir:
             with open(os.path.join(data_dir, "shared.md"), "w", encoding="utf-8") as f:
-                f.write("# Shared\n共享退货政策\n")
+                f.write("# Shared\nShared return policy.\n")
             with open(os.path.join(upload_dir, "shared-upload.md"), "w", encoding="utf-8") as f:
-                f.write("# Shared Upload\n共享运费说明\n")
+                f.write("# Shared Upload\nShared shipping instructions.\n")
 
             user_one_dir = os.path.join(upload_dir, quote("user-1", safe=""))
             user_two_dir = os.path.join(upload_dir, quote("user-2", safe=""))
@@ -85,9 +85,9 @@ class RagStabilityTests(unittest.TestCase):
             os.makedirs(user_two_dir, exist_ok=True)
 
             with open(os.path.join(user_one_dir, "private-one.md"), "w", encoding="utf-8") as f:
-                f.write("# Private One\n用户一密码重置流程\n")
+                f.write("# Private One\nPassword reset flow for user one.\n")
             with open(os.path.join(user_two_dir, "private-two.md"), "w", encoding="utf-8") as f:
-                f.write("# Private Two\n用户二发票申请流程\n")
+                f.write("# Private Two\nInvoice flow for user two.\n")
 
             with patch.dict(
                 chroma_conf,
@@ -96,11 +96,11 @@ class RagStabilityTests(unittest.TestCase):
             ):
                 retriever = BM25Retriever(upload_dir=upload_dir)
 
-                shared_only = retriever.retrieve("密码重置")
+                shared_only = retriever.retrieve("password reset")
                 self.assertEqual(shared_only, [])
                 self.assertEqual({doc.metadata["user_id"] for doc in retriever.documents}, {"__shared__"})
 
-                user_one_private = retriever.retrieve("密码重置", user_id="user-1")
+                user_one_private = retriever.retrieve("password reset", user_id="user-1")
                 self.assertEqual(len(user_one_private), 1)
                 self.assertEqual(user_one_private[0].metadata["user_id"], "user-1")
                 self.assertEqual(
@@ -108,14 +108,14 @@ class RagStabilityTests(unittest.TestCase):
                     {"__shared__", "user-1"},
                 )
 
-                user_two_private = retriever.retrieve("密码重置", user_id="user-2")
+                user_two_private = retriever.retrieve("password reset", user_id="user-2")
                 self.assertEqual(user_two_private, [])
                 self.assertEqual(
                     {doc.metadata["user_id"] for doc in retriever.documents},
                     {"__shared__", "user-2"},
                 )
 
-                user_one_shared = retriever.retrieve("运费说明", user_id="user-1")
+                user_one_shared = retriever.retrieve("shipping instructions", user_id="user-1")
                 self.assertEqual(len(user_one_shared), 1)
                 self.assertEqual(user_one_shared[0].metadata["user_id"], "__shared__")
 
@@ -128,16 +128,36 @@ class RagStabilityTests(unittest.TestCase):
         service._get_vector_store = Mock(return_value=vector_store)
         service._get_bm25_retriever = Mock(return_value=bm25_retriever)
 
-        docs = service._hybrid_retrieval_single("如何退货", user_id="user-1")
+        docs = service._hybrid_retrieval_single("how to return", user_id="user-1")
 
-        vector_store.retrieve_documents.assert_called_once_with("如何退货", 10, "user-1")
-        bm25_retriever.retrieve.assert_called_once_with("如何退货", 10, "user-1")
+        vector_store.retrieve_documents.assert_called_once_with("how to return", 10, "user-1")
+        bm25_retriever.retrieve.assert_called_once_with("how to return", 10, "user-1")
         self.assertEqual(len(docs), 2)
+
+    def test_build_source_references_marks_knowledge_sources(self):
+        documents = [
+            Document(
+                page_content="Replace the main brush every 6 months.",
+                metadata={
+                    "doc_id": "doc-1",
+                    "source_file": "maintenance.md",
+                    "page": 2,
+                    "section_title": "Brush care",
+                },
+            )
+        ]
+
+        sources = RagSummarizeService.build_source_references(documents)
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].source_type, "knowledge")
+        self.assertEqual(sources[0].title, "maintenance.md")
+        self.assertEqual(sources[0].tool_name, "rag_summarize")
 
     def test_vector_store_chunk_id_is_stable_and_non_sequential(self):
         service = VectorStoreService.__new__(VectorStoreService)
         document = Document(
-            page_content="结构化文本内容",
+            page_content="Structured document content.",
             metadata={
                 "source_path": "D:/data/sample.pdf",
                 "file_md5": "abc123",
