@@ -33,6 +33,7 @@ class SessionManager:
         session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}_{uuid4().hex[:8]}"
         self.redis.set_session_user(session_id, user_id)
         self.redis.add_user_session(user_id, session_id)
+        self.save_session(session_id, [], user_id)
         return session_id
 
     def save_session(self, session_id: str, messages: List[Dict[str, Any]], user_id: str | None = None):

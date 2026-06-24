@@ -1,30 +1,36 @@
-import time
+﻿import time
+
 import numpy as np
+
 from model.factory import embed_model
+from utils.dashscope_runtime import get_semantic_checker_max_retries
 from utils.logger_handler import logger
 
 
 class SemanticChecker:
     def __init__(self):
         self.embedding_model = embed_model
-        self.max_retries = 3
+        self.max_retries = get_semantic_checker_max_retries()
 
     def _embed_with_retry(self, text: str) -> list[float]:
-        """带重试的嵌入调用，处理 DashScope 瞬时错误（KeyError: 'request' 等）"""
         last_error = None
         for attempt in range(self.max_retries):
             try:
                 return self.embedding_model.embed_query(text)
-            except Exception as e:
-                last_error = e
+            except Exception as error:
+                last_error = error
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt  # 1s, 2s
+                    wait_time = min(1 + attempt, 2)
                     logger.warning(
-                        f"[SemanticChecker]嵌入失败(第{attempt+1}次)，"
-                        f"{wait_time}s后重试: {type(e).__name__}: {str(e)}"
+                        "[SemanticChecker] embedding failed (attempt %s/%s), retry in %ss: %s: %s",
+                        attempt + 1,
+                        self.max_retries,
+                        wait_time,
+                        type(error).__name__,
+                        error,
                     )
                     time.sleep(wait_time)
-        logger.error(f"[SemanticChecker]嵌入失败，已达最大重试次数: {str(last_error)}")
+        logger.error("[SemanticChecker] embedding failed after %s attempts: %s", self.max_retries, last_error)
         raise last_error
 
     def calculate_similarity(self, text1: str, text2: str) -> float:
@@ -39,7 +45,3 @@ class SemanticChecker:
             return 0.0
 
         return dot_product / (norm1 * norm2)
-
-    def check_similarity(self, original: str, rewritten: str, threshold: float = 0.8) -> tuple:
-        similarity = self.calculate_similarity(original, rewritten)
-        return similarity >= threshold, similarity

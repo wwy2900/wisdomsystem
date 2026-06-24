@@ -4,6 +4,32 @@
 
 ---
 
+## [v1.10] - 2026-06-24
+
+### Fixed
+
+- 修复 `SessionManager.create_session` 不创建会话文件导致新对话 404 的问题
+- 修复 `chat_stream` 异步处理逻辑，确保 SSE 流式响应正确返回
+- 修复 `onclose` 回调重复报错问题（添加 `terminatedByError` 标志）
+- 登录/注册页面改进错误信息展示（`describeRequestError`）
+
+### Added
+
+- 新增 `AuthService.warmup_async` 方法，启动时异步预热 ChatService
+- 新增 `utils/dashscope_runtime.py`（DashScope 运行时工具）
+- 新增 `utils/model_cache.py`（模型缓存工具）
+
+### Changed
+
+- `api/routes/auth.py` 路由函数从同步改为异步
+- `api/routes/me.py` chat_stream 使用 `asyncio.Queue` + `threading.Thread` 重构
+- `rag/bm25_retriever.py` BM25 检索器增强（82 行修改）
+- `services/chat_service.py` ChatService 增强（15 行修改）
+- `rag/rag_service.py` RAG 服务增强（5 行修改）
+- `tests/test_rag_stability.py` 新增测试用例（25 行）
+
+---
+
 ## [v1.9] - 2026-06-23
 
 ### Added

@@ -19,6 +19,9 @@ class FakeChatService:
     def __init__(self):
         self.sessions = {}
 
+    def warmup_async(self):
+        return None
+
     def create_session(self, user_id: str) -> str:
         session_id = f"session_{len(self.sessions) + 1}"
         self.sessions[session_id] = {
@@ -77,6 +80,14 @@ class FakeChatService:
         session["messages"].append({"role": "assistant", "content": "reply-1 reply-2", "sources": sources})
         yield ("_done", {"sources": sources})
 
+
+
+class FakeErrorChatService(FakeChatService):
+    def chat_stream(self, user_id: str, session_id: str, message: str):
+        raise RuntimeError(
+            "HTTPSConnectionPool(host='dashscope.aliyuncs.com', port=443): Max retries exceeded with url: / "
+            "(Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol'))))"
+        )
 
 class FakeKnowledgeService:
     def __init__(self):
@@ -291,6 +302,29 @@ class ApiAuthTests(unittest.TestCase):
             self.assertIn("event: done", body)
             self.assertIn('"sources":', body)
 
+    def test_me_chat_stream_classifies_dashscope_failures(self):
+        temp_dir = tempfile.mkdtemp(prefix="wisdomsystem-auth-")
+        db_path = os.path.join(temp_dir, "auth.db")
+        os.environ["AUTH_BOOTSTRAP_ADMIN_PASSWORD"] = "Admin12345!"
+        os.environ["AUTH_BOOTSTRAP_USER_PASSWORD"] = "User12345!"
+        from database.sqlite_db import SQLiteDatabase
+        from services.auth_service import AuthService
+        from api.main import app
+
+        auth_service = AuthService(db=SQLiteDatabase(db_path=db_path))
+        with patch("api.main.build_chat_service", return_value=FakeErrorChatService()), patch(
+            "api.main.build_knowledge_service",
+            return_value=FakeKnowledgeService(),
+        ), patch("api.main.build_auth_service", return_value=auth_service):
+            with TestClient(app) as client:
+                self.login(client, "demo_user", "User12345!")
+                with client.stream("POST", "/api/v1/me/chat/stream", json={"message": "hello"}) as response:
+                    body = "".join(chunk.decode("utf-8") for chunk in response.iter_bytes())
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("event: error", body)
+                self.assertIn("dashscope_proxy_tls", body)
+                self.assertIn("proxy/TLS chain", body)
     def test_session_detail_returns_assistant_sources(self):
         with self.make_client() as client:
             self.login(client, "demo_user", "User12345!")

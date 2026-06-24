@@ -1,4 +1,4 @@
-"""FastAPI application entrypoint."""
+﻿"""FastAPI application entrypoint."""
 from contextlib import asynccontextmanager
 import os
 
@@ -47,6 +47,7 @@ async def lifespan(app: FastAPI):
     app.state.chat_service = build_chat_service()
     app.state.knowledge_service = build_knowledge_service()
     app.state.auth_service = build_auth_service()
+    app.state.chat_service.warmup_async()
     logger.info("[FastAPI] services ready")
     yield
     logger.info("[FastAPI] shutdown")
@@ -69,7 +70,7 @@ app.add_middleware(
 
 
 @app.get("/health", response_model=HealthResponse)
-def health(request: Request):
+async def health(request: Request):
     chat_service = getattr(request.app.state, "chat_service", None)
     redis_cache = getattr(chat_service, "redis_cache", None)
     cache_backend = getattr(redis_cache, "backend", "unknown")

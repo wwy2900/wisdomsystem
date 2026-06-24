@@ -2,6 +2,7 @@
 import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import { describeRequestError } from "@/api/http";
 import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
@@ -35,7 +36,7 @@ async function submitLogin() {
     const user = await authStore.login(loginForm.username, loginForm.password);
     router.push(user.role === "admin" ? "/admin/knowledge" : "/chat");
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "Login failed.");
+    ElMessage.error(describeRequestError(error));
   } finally {
     loading.value = false;
   }
@@ -57,7 +58,7 @@ async function submitRegister() {
     resetRegisterForm();
     router.push("/chat");
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "Registration failed.");
+    ElMessage.error(describeRequestError(error));
   } finally {
     loading.value = false;
   }

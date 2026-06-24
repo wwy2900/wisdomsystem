@@ -217,5 +217,5 @@ npx playwright test
 
 ## 当前版本
 
-- 当前仓库主线版本：`v1.9`
-- 版本重点：量化评测框架（RAG 检索/生成、Agent 工具、SSE 性能）、注册与管理员用户页、客服业务工具、答案来源展示、工具审计日志、Docker Compose 主部署路径
+- 当前仓库主线版本：`v1.10`
+- 版本重点：Bug 修复（新对话 404、异步流式响应）、BM25/RAG/ChatService 增强、量化评测框架、客服业务工具、Docker Compose 主部署路径

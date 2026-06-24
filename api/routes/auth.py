@@ -1,4 +1,4 @@
-"""Browser authentication routes."""
+﻿"""Browser authentication routes."""
 import os
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
@@ -30,7 +30,7 @@ def _set_session_cookie(response: Response, auth_service: AuthService, session_i
 
 
 @router.post("/login", response_model=AuthSessionResponse)
-def login(
+async def login(
     req: LoginRequest,
     response: Response,
     auth_service: AuthService = Depends(get_auth_service),
@@ -45,7 +45,7 @@ def login(
 
 
 @router.post("/register", response_model=AuthSessionResponse)
-def register(
+async def register(
     req: RegisterRequest,
     response: Response,
     auth_service: AuthService = Depends(get_auth_service),
@@ -62,7 +62,7 @@ def register(
 
 
 @router.post("/logout", response_model=OperationStatusResponse)
-def logout(
+async def logout(
     response: Response,
     current_user: dict = Depends(get_current_user),
     auth_service: AuthService = Depends(get_auth_service),
@@ -78,5 +78,5 @@ def logout(
 
 
 @router.get("/me", response_model=CurrentUserResponse)
-def me(current_user: dict = Depends(get_current_user)):
+async def me(current_user: dict = Depends(get_current_user)):
     return CurrentUserResponse(**current_user)

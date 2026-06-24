@@ -1,4 +1,4 @@
-import { fetchEventSource } from "@microsoft/fetch-event-source";
+﻿import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { defineStore } from "pinia";
 
 import { getSession } from "@/api/chat";
@@ -63,6 +63,7 @@ export const useChatStore = defineStore("chat", {
       let resolvedSessionId = sessionStore.currentSessionId || undefined;
       let completed = false;
       let failureHandled = false;
+      let terminatedByError = false;
       let resolvedSources: SourceReference[] = [];
 
       const handleFailure = (error: unknown) => {
@@ -101,6 +102,7 @@ export const useChatStore = defineStore("chat", {
             }
 
             if (event.event === "error") {
+              terminatedByError = true;
               throw new Error(payload.content || "Stream failed");
             }
 
@@ -121,7 +123,7 @@ export const useChatStore = defineStore("chat", {
             }
           },
           onclose: () => {
-            if (!completed) {
+            if (!completed && !terminatedByError) {
               throw new Error("The response stream closed before completion.");
             }
           },

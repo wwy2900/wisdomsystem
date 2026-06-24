@@ -1,5 +1,7 @@
-"""Authenticated self-scoped routes for the Vue frontend."""
+﻿"""Authenticated self-scoped routes for the Vue frontend."""
+import asyncio
 import json
+import threading
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sse_starlette.sse import EventSourceResponse
@@ -15,6 +17,8 @@ from api.schemas import (
     SessionInfo,
     UserChunkListResponse,
 )
+from utils.dashscope_runtime import build_dashscope_error_payload
+from utils.logger_handler import logger
 
 
 router = APIRouter(prefix="/api/v1/me", tags=["me"])
@@ -70,16 +74,39 @@ async def chat_stream(
 
     async def event_generator():
         yield {"event": "session", "data": json.dumps({"session_id": session_id}, ensure_ascii=False)}
-        try:
-            done_payload = {"session_id": session_id, "sources": []}
-            for event_type, payload in service.chat_stream(current_user["id"], session_id, req.message):
-                if event_type == "_done":
-                    done_payload["sources"] = payload.get("sources", [])
-                    continue
-                yield {"event": event_type, "data": json.dumps(payload, ensure_ascii=False)}
-            yield {"event": "done", "data": json.dumps(done_payload, ensure_ascii=False)}
-        except Exception as exc:
-            yield {"event": "error", "data": json.dumps({"content": str(exc)}, ensure_ascii=False)}
+
+        queue: asyncio.Queue[tuple[str, dict | None]] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+        done_payload = {"session_id": session_id, "sources": []}
+
+        def push(event_type: str, payload: dict | None = None):
+            loop.call_soon_threadsafe(queue.put_nowait, (event_type, payload))
+
+        def produce_stream():
+            try:
+                for event_type, payload in service.chat_stream(current_user["id"], session_id, req.message):
+                    push(event_type, payload)
+            except Exception as error:
+                logger.warning("[SSE] chat stream failed for session %s: %s", session_id, error)
+                push("error", build_dashscope_error_payload(error))
+            finally:
+                push("__end__")
+
+        threading.Thread(target=produce_stream, daemon=True).start()
+
+        while True:
+            event_type, payload = await queue.get()
+            if event_type == "__end__":
+                break
+            if event_type == "_done":
+                done_payload["sources"] = payload.get("sources", []) if payload else []
+                continue
+
+            yield {"event": event_type, "data": json.dumps(payload or {}, ensure_ascii=False)}
+            if event_type == "error":
+                return
+
+        yield {"event": "done", "data": json.dumps(done_payload, ensure_ascii=False)}
 
     return EventSourceResponse(event_generator())
 

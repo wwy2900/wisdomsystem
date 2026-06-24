@@ -102,6 +102,11 @@ class RagSummarizeService:
             except Exception as exc:
                 logger.warning(f"[RAG] failed to invalidate cache: {str(exc)}")
 
+    def warmup_shared_retrieval_state(self):
+        try:
+            self._get_bm25_retriever().preload_shared_scope()
+        except Exception as exc:
+            logger.warning(f"[RAG] shared warmup skipped: {str(exc)}")
     def _local_cache_get(self, key: str):
         return self._local_cache.get(key)
 

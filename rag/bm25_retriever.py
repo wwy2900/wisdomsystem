@@ -1,8 +1,10 @@
-import os
-from rank_bm25 import BM25Okapi
+﻿import os
+import threading
 from functools import lru_cache
 
 import jieba
+from rank_bm25 import BM25Okapi
+
 from rag.document_parsers import DocumentParserFactory
 from utils.knowledge_sources import iter_knowledge_source_files
 from utils.logger_handler import logger
@@ -14,7 +16,11 @@ class BM25Retriever:
         self.corpus = []
         self.documents = []
         self.bm25 = None
-        self._scope_indexes = {}
+        self._scope_indexes: dict[str, dict] = {}
+        self._scope_status: dict[str, str] = {}
+        self._scope_errors: dict[str, str] = {}
+        self._scope_threads: dict[str, threading.Thread] = {}
+        self._scope_lock = threading.Lock()
 
     @staticmethod
     def _normalize_scope(user_id: str | None = None) -> str:
@@ -36,8 +42,8 @@ class BM25Retriever:
 
             try:
                 docs = DocumentParserFactory.parse(filepath)
-            except Exception as e:
-                logger.error(f"[BM25Retriever] failed to parse {filepath}: {str(e)}", exc_info=True)
+            except Exception as error:
+                logger.error(f"[BM25Retriever] failed to parse {filepath}: {error}", exc_info=True)
                 continue
 
             for doc in docs:
@@ -61,28 +67,78 @@ class BM25Retriever:
         self._scope_indexes[scope] = index
         return index
 
-    def _get_scope_index(self, user_id: str | None = None) -> dict:
-        scope = self._normalize_scope(user_id)
-        index = self._scope_indexes.get(scope)
-        if index is None:
+    def _build_scope_index_safe(self, scope: str):
+        try:
+            user_id = None if scope == "__shared__" else scope
             index = self._build_scope_index(user_id=user_id)
-        self._set_active_index(index)
-        return index
+            with self._scope_lock:
+                self._scope_status[scope] = "ready"
+                self._scope_errors.pop(scope, None)
+                self._scope_threads.pop(scope, None)
+            logger.info("[BM25Retriever] scope %s ready with %s documents", scope, len(index["documents"]))
+        except Exception as error:
+            with self._scope_lock:
+                self._scope_status[scope] = "failed"
+                self._scope_errors[scope] = str(error)
+                self._scope_threads.pop(scope, None)
+            logger.error("[BM25Retriever] scope %s build failed: %s", scope, error, exc_info=True)
+
+    def prepare_scope(self, user_id: str | None = None, blocking: bool = False, timeout: float | None = None) -> bool:
+        scope = self._normalize_scope(user_id)
+        thread = None
+
+        with self._scope_lock:
+            if scope in self._scope_indexes:
+                self._set_active_index(self._scope_indexes[scope])
+                return True
+
+            status = self._scope_status.get(scope)
+            if status != "building":
+                self._scope_status[scope] = "building"
+                thread = threading.Thread(target=self._build_scope_index_safe, args=(scope,), daemon=True)
+                self._scope_threads[scope] = thread
+                thread.start()
+            else:
+                thread = self._scope_threads.get(scope)
+
+        if blocking and thread is not None:
+            thread.join(timeout=timeout)
+
+        index = self._scope_indexes.get(scope)
+        if index is not None:
+            self._set_active_index(index)
+            return True
+        return False
+
+    def get_scope_status(self, user_id: str | None = None) -> str:
+        scope = self._normalize_scope(user_id)
+        if scope in self._scope_indexes:
+            return "ready"
+        return self._scope_status.get(scope, "idle")
+
+    def preload_shared_scope(self):
+        self.prepare_scope(user_id=None, blocking=False)
 
     def reload(self):
         self._scope_indexes.clear()
+        self._scope_status.clear()
+        self._scope_errors.clear()
+        self._scope_threads.clear()
         self.corpus = []
         self.documents = []
         self.bm25 = None
 
     @lru_cache(maxsize=1000)
     def _tokenize(self, text: str) -> tuple:
-        """jieba 中文分词，返回 tuple 以便缓存"""
         return tuple(jieba.lcut(text))
 
     def retrieve(self, query: str, k: int = 10, user_id: str | None = None) -> list:
-        index = self._get_scope_index(user_id=user_id)
-        if not index["bm25"]:
+        if not self.prepare_scope(user_id=user_id, blocking=False):
+            return []
+
+        scope = self._normalize_scope(user_id)
+        index = self._scope_indexes.get(scope)
+        if not index or not index["bm25"]:
             return []
 
         tokenized_query = list(self._tokenize(query))

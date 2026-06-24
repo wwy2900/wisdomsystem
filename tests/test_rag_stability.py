@@ -60,6 +60,7 @@ class RagStabilityTests(unittest.TestCase):
                 clear=False,
             ):
                 retriever = BM25Retriever(upload_dir=upload_dir)
+                self.assertTrue(retriever.prepare_scope(blocking=True, timeout=5))
                 retriever.retrieve("returns")
                 self.assertEqual(len(retriever.documents), 1)
 
@@ -67,6 +68,7 @@ class RagStabilityTests(unittest.TestCase):
                     f.write("# Shipping\nShips within 48 hours.\n")
 
                 retriever.reload()
+                self.assertTrue(retriever.prepare_scope(blocking=True, timeout=5))
                 retriever.retrieve("shipping")
 
         self.assertEqual(len(retriever.documents), 2)
@@ -96,10 +98,12 @@ class RagStabilityTests(unittest.TestCase):
             ):
                 retriever = BM25Retriever(upload_dir=upload_dir)
 
+                retriever.prepare_scope(blocking=True, timeout=5)
                 shared_only = retriever.retrieve("password reset")
                 self.assertEqual(shared_only, [])
                 self.assertEqual({doc.metadata["user_id"] for doc in retriever.documents}, {"__shared__"})
 
+                retriever.prepare_scope(user_id="user-1", blocking=True, timeout=5)
                 user_one_private = retriever.retrieve("password reset", user_id="user-1")
                 self.assertEqual(len(user_one_private), 1)
                 self.assertEqual(user_one_private[0].metadata["user_id"], "user-1")
@@ -108,6 +112,7 @@ class RagStabilityTests(unittest.TestCase):
                     {"__shared__", "user-1"},
                 )
 
+                retriever.prepare_scope(user_id="user-2", blocking=True, timeout=5)
                 user_two_private = retriever.retrieve("password reset", user_id="user-2")
                 self.assertEqual(user_two_private, [])
                 self.assertEqual(
@@ -118,6 +123,26 @@ class RagStabilityTests(unittest.TestCase):
                 user_one_shared = retriever.retrieve("shipping instructions", user_id="user-1")
                 self.assertEqual(len(user_one_shared), 1)
                 self.assertEqual(user_one_shared[0].metadata["user_id"], "__shared__")
+
+    def test_bm25_retriever_first_call_starts_background_build_without_blocking(self):
+        with tempfile.TemporaryDirectory() as data_dir, tempfile.TemporaryDirectory() as upload_dir:
+            with open(os.path.join(data_dir, "shared.md"), "w", encoding="utf-8") as f:
+                f.write("# Shared\nShared return policy.\n")
+
+            with patch.dict(
+                chroma_conf,
+                {"data_path": data_dir, "allow_knowledge_file_type": ["md"]},
+                clear=False,
+            ):
+                retriever = BM25Retriever(upload_dir=upload_dir)
+
+                first_results = retriever.retrieve("return policy")
+
+                self.assertEqual(first_results, [])
+                self.assertEqual(retriever.get_scope_status(), "building")
+                self.assertTrue(retriever.prepare_scope(blocking=True, timeout=5))
+                self.assertEqual(retriever.get_scope_status(), "ready")
+                self.assertEqual(len(retriever.documents), 1)
 
     def test_hybrid_retrieval_single_passes_user_id_to_vector_and_bm25(self):
         service = RagSummarizeService.__new__(RagSummarizeService)

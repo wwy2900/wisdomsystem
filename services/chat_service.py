@@ -1,5 +1,6 @@
-"""Chat service used by FastAPI routes."""
+﻿"""Chat service used by FastAPI routes."""
 from typing import Any, Generator
+import threading
 
 from agent.react_agent import ReactAgent
 from agent.tools.runtime import get_source_references, reset_request_context, start_request_context
@@ -16,6 +17,17 @@ class ChatService:
         self.session_manager = SessionManager(self.redis_cache)
         self.agent = ReactAgent()
         logger.info("[ChatService] initialized")
+
+    def warmup_async(self):
+        def _warmup():
+            try:
+                from rag.rag_service import RagSummarizeService
+
+                RagSummarizeService().warmup_shared_retrieval_state()
+            except Exception as error:
+                logger.warning("[ChatService] warmup skipped: %s", error)
+
+        threading.Thread(target=_warmup, daemon=True).start()
 
     def create_session(self, user_id: str) -> str:
         return self.session_manager.create_session(user_id)
@@ -52,6 +64,7 @@ class ChatService:
         messages.append({"role": "user", "content": message})
 
         answer_parts: list[str] = []
+        sources: list[dict[str, Any]] = []
         context_token = start_request_context(user_id=user_id, session_id=session_id)
         try:
             for chunk in self.agent.execute_stream(message, user_id=user_id, session_id=session_id):

@@ -1,4 +1,4 @@
-import importlib.util
+﻿import importlib.util
 import json
 import os
 import tempfile
@@ -20,6 +20,7 @@ from rag.document_parsers import (
 )
 from rag.question_splitter import QuestionBasedSplitter
 from utils.config_handler import chroma_conf
+from utils.model_cache import ensure_docling_cache_dirs
 
 
 HAS_DOCX = importlib.util.find_spec("docx") is not None
@@ -236,13 +237,21 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(docs[0].metadata["row_index"], 2)
         self.assertIn("city: Beijing", docs[1].page_content)
 
+    def test_ensure_docling_cache_dirs_uses_project_writable_defaults(self):
+        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(os.environ, {"DOC_MODEL_CACHE_DIR": temp_dir}, clear=False):
+            cache_dirs = ensure_docling_cache_dirs()
+
+            self.assertTrue(cache_dirs["base_dir"].startswith(temp_dir))
+            self.assertTrue(os.path.isdir(cache_dirs["hub_cache"]))
+            self.assertTrue(os.environ["DOC_MODEL_CACHE_DIR"].startswith(temp_dir))
+
 
 class IntegrationShapeTests(unittest.TestCase):
     def test_question_splitter_preserves_source_metadata(self):
         splitter = QuestionBasedSplitter()
         documents = [
             Document(
-                page_content="第一段内容。\n\n第二段内容。",
+                page_content="First structured paragraph.\nSecond structured paragraph.",
                 metadata={
                     "source": "sample.json",
                     "file_type": "json",
@@ -313,9 +322,9 @@ class IntegrationShapeTests(unittest.TestCase):
             markdown_path = os.path.join(temp_dir, "faq.md")
             other_markdown_path = os.path.join(temp_dir, "shipping.md")
             with open(markdown_path, "w", encoding="utf-8") as f:
-                f.write("# 退款\n退款流程说明\n")
+                f.write("# FAQ\nReturn policy details.\n")
             with open(other_markdown_path, "w", encoding="utf-8") as f:
-                f.write("# 发货\n发货时效说明\n")
+                f.write("# Shipping\nDelivery details.\n")
 
             with patch.dict(
                 chroma_conf,
@@ -323,7 +332,8 @@ class IntegrationShapeTests(unittest.TestCase):
                 clear=False,
             ):
                 retriever = BM25Retriever()
-                retriever.retrieve("退款")
+                self.assertTrue(retriever.prepare_scope(blocking=True, timeout=5))
+                retriever.retrieve("return policy")
 
         self.assertEqual(len(retriever.documents), 2)
         self.assertEqual(len(retriever.corpus), 2)

@@ -1,4 +1,4 @@
-const JSON_HEADERS = {
+﻿const JSON_HEADERS = {
   "Content-Type": "application/json",
 };
 
@@ -45,6 +45,27 @@ function createTimeoutSignal(timeoutMs = DEFAULT_TIMEOUT_MS) {
     signal: controller.signal,
     cleanup: () => window.clearTimeout(timer),
   };
+}
+
+export function describeRequestError(error: unknown) {
+  if (error instanceof ApiError) {
+    if (error.status === 401) {
+      return "Invalid username or password.";
+    }
+    if (error.status >= 500) {
+      return "The backend is temporarily unavailable or busy.";
+    }
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    if (error.message.includes("Request timed out")) {
+      return "Request timed out. The backend may be busy.";
+    }
+    return error.message;
+  }
+
+  return "Request failed.";
 }
 
 export async function getJson<T>(url: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
